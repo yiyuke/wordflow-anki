@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Wordflow to Anki</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Wordflow</h1>
+          <p>⌥⇧W 手动输入 · ⌥⇧A 选中直存</p>
+        </div>
+        <span id="health" class="status">检查中</span>
+      </header>
+
+      <label for="word">单词或短语</label>
+      <input id="word" autocomplete="off" placeholder="meticulous" autofocus />
+
+      <label for="context">上下文（可选）</label>
+      <textarea id="context" rows="3" placeholder="粘贴看到这个词的原句"></textarea>
+
+      <button id="add">生成并加入 Anki</button>
+      <p id="result" role="status"></p>
+
+      <details>
+        <summary>本地服务设置</summary>
+        <label for="serviceUrl">服务地址</label>
+        <div class="row">
+          <input id="serviceUrl" value="http://127.0.0.1:8766" />
+          <button id="save" class="secondary">保存</button>
+        </div>
+      </details>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
