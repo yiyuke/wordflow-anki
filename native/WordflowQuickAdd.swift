@@ -61,12 +61,20 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var pinButton: NSButton!
     private var statusLabel: NSTextField!
     private var progress: NSProgressIndicator!
+    private var keyMonitor: Any?
     private var isSubmitting = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         buildWindow()
+        installKeyboardMonitor()
         showWindow()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -81,17 +89,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func buildWindow() {
         window = QuickAddWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 330),
+            contentRect: NSRect(x: 0, y: 0, width: 476, height: 350),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Wordflow Quick Add"
-        window.minSize = NSSize(width: 420, height: 300)
+        window.minSize = NSSize(width: 440, height: 330)
         window.maxSize = NSSize(width: 640, height: 500)
         window.isReleasedWhenClosed = false
         window.delegate = self
-        window.setFrameAutosaveName("WordflowQuickAddWindow")
+        window.setFrameAutosaveName("WordflowQuickAddWindowV2")
         window.submitHandler = { [weak self] in self?.submit() }
         window.pinHandler = { [weak self] in self?.togglePin() }
         window.closeHandler = { [weak self] in self?.hideWindow() }
@@ -100,14 +108,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         content.translatesAutoresizingMaskIntoConstraints = false
         window.contentView = content
 
-        let title = label("快速添加到 Anki", size: 20, weight: .semibold, color: .labelColor)
-        let subtitle = label("输入单词，可选填看到它的原句", size: 12, weight: .regular, color: .secondaryLabelColor)
+        let title = label("快速添加到 Anki", size: 21, weight: .bold, color: .labelColor)
+        let subtitle = label("打开窗口：⌥⇧W", size: 13, weight: .semibold, color: .controlAccentColor)
         let titleStack = NSStackView(views: [title, subtitle])
         titleStack.orientation = .vertical
         titleStack.alignment = .leading
-        titleStack.spacing = 2
+        titleStack.spacing = 3
 
         pinButton = NSButton(checkboxWithTitle: "置顶", target: self, action: #selector(pinClicked))
+        pinButton.font = .systemFont(ofSize: 13, weight: .medium)
+        pinButton.contentTintColor = .labelColor
         pinButton.toolTip = "始终显示在其他窗口上方（⌘P）"
         pinButton.setAccessibilityIdentifier("pinButton")
 
@@ -118,22 +128,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         header.alignment = .centerY
         header.spacing = 12
 
-        let wordLabel = label("单词或短语", size: 12, weight: .medium, color: .secondaryLabelColor)
+        let wordLabel = label("单词或短语", size: 13, weight: .semibold, color: .labelColor)
         wordField = NSTextField()
         wordField.placeholderString = "例如：serendipity"
-        wordField.font = .systemFont(ofSize: 15)
+        wordField.font = .systemFont(ofSize: 16)
         wordField.delegate = self
         wordField.focusRingType = .default
         wordField.setAccessibilityIdentifier("wordField")
 
-        let contextLabel = label("上下文（可选）", size: 12, weight: .medium, color: .secondaryLabelColor)
+        let contextLabel = label("例句或上下文（可选）", size: 13, weight: .semibold, color: .labelColor)
         contextView = ContextTextView()
-        contextView.font = .systemFont(ofSize: 14)
+        contextView.font = .systemFont(ofSize: 15)
         contextView.isRichText = false
         contextView.isAutomaticQuoteSubstitutionEnabled = false
         contextView.isAutomaticDashSubstitutionEnabled = false
         contextView.textContainerInset = NSSize(width: 8, height: 7)
-        contextView.setAccessibilityLabel("上下文，可选")
+        contextView.setAccessibilityLabel("例句或上下文，可选")
         contextView.setAccessibilityIdentifier("contextField")
         contextView.focusWordHandler = { [weak self] in self?.focusWord() }
         contextView.focusNextHandler = { [weak self] in self?.focusAddButton() }
@@ -145,14 +155,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         contextScroll.autohidesScrollers = true
         contextScroll.documentView = contextView
         contextScroll.translatesAutoresizingMaskIntoConstraints = false
-        contextScroll.heightAnchor.constraint(equalToConstant: 76).isActive = true
+        contextScroll.heightAnchor.constraint(equalToConstant: 82).isActive = true
 
         progress = NSProgressIndicator()
         progress.style = .spinning
         progress.controlSize = .small
         progress.isDisplayedWhenStopped = false
 
-        statusLabel = label("", size: 12, weight: .regular, color: .secondaryLabelColor)
+        statusLabel = label("", size: 13, weight: .medium, color: .secondaryLabelColor)
         statusLabel.lineBreakMode = .byTruncatingTail
         statusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         let statusSpacer = NSView()
@@ -163,10 +173,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         statusRow.spacing = 7
         statusRow.heightAnchor.constraint(equalToConstant: 18).isActive = true
 
-        let hint = label("↓ / Tab 切换  ·  ⌘↩ 保存  ·  Esc 关闭", size: 11, weight: .regular, color: .tertiaryLabelColor)
+        let hint = label("↓ / Tab 移动焦点  ·  ⌘↩ 保存  ·  Esc 收起", size: 12, weight: .medium, color: .secondaryLabelColor)
         addButton = NSButton(title: "加入 Anki", target: self, action: #selector(addClicked))
         addButton.bezelStyle = .rounded
         addButton.controlSize = .large
+        addButton.font = .systemFont(ofSize: 14, weight: .semibold)
         addButton.keyEquivalent = "\r"
         addButton.keyEquivalentModifierMask = [.command]
         addButton.setAccessibilityIdentifier("addButton")
@@ -198,7 +209,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18),
             header.widthAnchor.constraint(equalTo: stack.widthAnchor),
             wordField.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            wordField.heightAnchor.constraint(equalToConstant: 34),
+            wordField.heightAnchor.constraint(equalToConstant: 36),
             contextScroll.widthAnchor.constraint(equalTo: stack.widthAnchor),
             statusRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
             footer.widthAnchor.constraint(equalTo: stack.widthAnchor)
@@ -208,6 +219,34 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         contextView.nextKeyView = addButton
         addButton.nextKeyView = wordField
         applyPin(defaults.bool(forKey: "windowPinned"))
+    }
+
+    private func installKeyboardMonitor() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.window.isVisible, event.window === self.window else {
+                return event
+            }
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
+
+            if event.keyCode == 53 {
+                self.hideWindow()
+                return nil
+            }
+            if modifiers.contains(.command), key == "p" {
+                self.togglePin()
+                return nil
+            }
+            if modifiers.contains(.command), key == "q" {
+                NSApp.terminate(nil)
+                return nil
+            }
+            if modifiers.contains(.command), event.keyCode == 36 || event.keyCode == 76 {
+                self.submit()
+                return nil
+            }
+            return event
+        }
     }
 
     private func label(_ text: String, size: CGFloat, weight: NSFont.Weight, color: NSColor) -> NSTextField {

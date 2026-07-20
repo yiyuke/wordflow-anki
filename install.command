@@ -23,6 +23,7 @@ mkdir -p "$DEST" "$LOG_DIR" "$(dirname "$AGENT")"
 /bin/cp "$ROOT/configure-api-key.command" "$DEST/configure-api-key.command"
 
 if command -v swiftc >/dev/null 2>&1; then
+  /usr/bin/killall WordflowQuickAdd 2>/dev/null || true
   "$ROOT/native/build-app.sh" "$DEST" >/dev/null
 else
   echo "提示：未找到 Swift 编译器，将使用浏览器备用窗口。"

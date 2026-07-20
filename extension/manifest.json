@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Wordflow to Anki",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Capture selected English words with context and add AI-generated cards to Anki.",
   "permissions": ["contextMenus", "storage", "activeTab", "tabs"],
   "host_permissions": [
