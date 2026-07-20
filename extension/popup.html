@@ -10,10 +10,9 @@
     <main>
       <header>
         <div>
-          <h1>Wordflow</h1>
-          <p>⌥⇧W 手动输入 · ⌥⇧A 选中直存</p>
+          <h1>快速添加到 Anki</h1>
+          <p>输入单词，可选填看到它的原句</p>
         </div>
-        <span id="health" class="status">检查中</span>
       </header>
 
       <label for="word">单词或短语</label>
@@ -24,15 +23,7 @@
 
       <button id="add">生成并加入 Anki</button>
       <p id="result" role="status"></p>
-
-      <details>
-        <summary>本地服务设置</summary>
-        <label for="serviceUrl">服务地址</label>
-        <div class="row">
-          <input id="serviceUrl" value="http://127.0.0.1:8766" />
-          <button id="save" class="secondary">保存</button>
-        </div>
-      </details>
+      <p class="hint">↓ / Tab 切换 · Enter 保存 · Esc 关闭</p>
     </main>
     <script src="popup.js"></script>
   </body>

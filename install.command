@@ -19,7 +19,14 @@ mkdir -p "$DEST" "$LOG_DIR" "$(dirname "$AGENT")"
 /usr/bin/ditto "$ROOT/local_service" "$DEST/local_service"
 /usr/bin/ditto "$ROOT/extension" "$DEST/extension"
 /usr/bin/ditto "$ROOT/macos" "$DEST/macos"
+/usr/bin/ditto "$ROOT/native" "$DEST/native"
 /bin/cp "$ROOT/configure-api-key.command" "$DEST/configure-api-key.command"
+
+if command -v swiftc >/dev/null 2>&1; then
+  "$ROOT/native/build-app.sh" "$DEST" >/dev/null
+else
+  echo "提示：未找到 Swift 编译器，将使用浏览器备用窗口。"
+fi
 
 if [[ ! -f "$DEST/.env" ]]; then
   /bin/cp "$ROOT/.env.example" "$DEST/.env"
@@ -58,4 +65,3 @@ echo "3. 选择上面的 extension 目录。"
 echo
 /usr/bin/open "$DEST"
 read -r "?按回车关闭窗口。"
-

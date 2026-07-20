@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -78,6 +79,7 @@ class Config:
     port: int
     openai_api_key: str
     openai_model: str
+    openai_reasoning_effort: str
     openai_base_url: str
     anki_url: str
     anki_api_key: str
@@ -98,6 +100,7 @@ class Config:
             port=int(os.getenv("SERVER_PORT", "8766")),
             openai_api_key=api_key,
             openai_model=os.getenv("OPENAI_MODEL", "gpt-5.6-luna"),
+            openai_reasoning_effort=os.getenv("OPENAI_REASONING_EFFORT", "none").strip().lower(),
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
             anki_url=os.getenv("ANKI_CONNECT_URL", "http://127.0.0.1:8765"),
             anki_api_key=os.getenv("ANKI_CONNECT_API_KEY", ""),
@@ -249,6 +252,7 @@ class OpenAICardGenerator:
 
         payload = {
             "model": self.config.openai_model,
+            "reasoning": {"effort": self.config.openai_reasoning_effort},
             "store": False,
             "input": [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -272,7 +276,7 @@ class OpenAICardGenerator:
                     "schema": CARD_SCHEMA,
                 }
             },
-            "max_output_tokens": 1800,
+            "max_output_tokens": 1400,
         }
         response = _request_json(
             f"{self.config.openai_base_url}/responses",
@@ -428,6 +432,8 @@ class AnkiClient:
     def __init__(self, config: Config):
         self.config = config
         self.mock_notes: Dict[str, int] = {}
+        self._model_ready = False
+        self._model_lock = threading.Lock()
 
     def invoke(self, action: str, **params: Any) -> Any:
         payload: Dict[str, Any] = {"action": action, "version": 6, "params": params}
@@ -449,19 +455,25 @@ class AnkiClient:
     def ensure_model(self) -> None:
         if self.config.mock_anki:
             return
-        decks = self.invoke("deckNames")
-        if self.config.deck_name not in decks:
-            self.invoke("createDeck", deck=self.config.deck_name)
-        models = self.invoke("modelNames")
-        if self.config.model_name not in models:
-            self.invoke(
-                "createModel",
-                modelName=self.config.model_name,
-                inOrderFields=NOTE_FIELDS,
-                css=CARD_CSS,
-                isCloze=False,
-                cardTemplates=CARD_TEMPLATES,
-            )
+        if self._model_ready:
+            return
+        with self._model_lock:
+            if self._model_ready:
+                return
+            decks = self.invoke("deckNames")
+            if self.config.deck_name not in decks:
+                self.invoke("createDeck", deck=self.config.deck_name)
+            models = self.invoke("modelNames")
+            if self.config.model_name not in models:
+                self.invoke(
+                    "createModel",
+                    modelName=self.config.model_name,
+                    inOrderFields=NOTE_FIELDS,
+                    css=CARD_CSS,
+                    isCloze=False,
+                    cardTemplates=CARD_TEMPLATES,
+                )
+            self._model_ready = True
 
     def add_card(
         self,

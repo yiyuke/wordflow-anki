@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Wordflow to Anki",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Capture selected English words with context and add AI-generated cards to Anki.",
   "permissions": ["contextMenus", "storage", "activeTab", "tabs"],
   "host_permissions": [
@@ -12,8 +12,7 @@
     "service_worker": "service-worker.js"
   },
   "action": {
-    "default_title": "Wordflow to Anki",
-    "default_popup": "popup.html"
+    "default_title": "打开 Wordflow 快速添加"
   },
   "commands": {
     "open-manual-input": {

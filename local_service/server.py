@@ -2,17 +2,48 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import urlparse
 
 from wordflow import Config, WordflowApp
 
 
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def quick_add_app_path() -> Path:
+    configured = os.getenv("WORDFLOW_QUICK_ADD_APP", "").strip()
+    candidates = [
+        Path(configured).expanduser() if configured else None,
+        ROOT / "Wordflow Quick Add.app",
+        ROOT / "native" / "build" / "Wordflow Quick Add.app",
+    ]
+    return next((path for path in candidates if path and path.exists()), ROOT / "Wordflow Quick Add.app")
+
+
+def open_quick_add_window() -> Dict[str, Any]:
+    if sys.platform != "darwin":
+        raise RuntimeError("原生快速窗口目前只支持 macOS")
+    app_path = quick_add_app_path()
+    if not app_path.exists():
+        raise RuntimeError("原生快速窗口尚未安装")
+    subprocess.Popen(
+        ["/usr/bin/open", str(app_path)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    return {"ok": True, "window": "native"}
+
+
 class Handler(BaseHTTPRequestHandler):
     app: WordflowApp
-    server_version = "Wordflow/0.1"
+    server_version = "Wordflow/0.4"
 
     def _headers(self, status: int = 200) -> None:
         self.send_response(status)
@@ -48,6 +79,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(self.app.capture(payload))
             elif path == "/api/generate":
                 self._json({"ok": True, **self.app.generate(payload)})
+            elif path == "/api/window/open":
+                self._json(open_quick_add_window())
             else:
                 self._json({"ok": False, "error": "Not found"}, 404)
         except ValueError as error:

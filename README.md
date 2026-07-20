@@ -5,7 +5,7 @@
 Wordflow 当前不是一个独立桌面 App，而是一套本地工具：
 
 ```text
-Arc / Chrome 扩展
+Arc / Chrome 扩展 → macOS 原生快速输入窗
         ↓
 macOS 本地服务（OpenAI Responses API）
         ↓
@@ -19,6 +19,8 @@ AnkiConnect → Anki 桌面版
 - Arc、Chrome、Edge 等 Chromium 浏览器：选词右键加入 Anki
 - 自动携带网页标题、URL 和附近上下文
 - 手动输入窗口，适合不能选中的链接、Word、PDF、Codex 等场景
+- 原生快速输入窗支持置顶、系统红黄绿按钮和全键盘操作
+- 窗口保持紧凑，并记住用户调整后的尺寸
 - 自动生成中文释义、IPA、英文定义、搭配、可靠词源、记忆提示和例句
 - 自动创建 `Vocabulary Inbox` 牌组和 `AI Vocabulary` Note Type
 - 每个单词生成 Recognition 和 Production 两张卡
@@ -30,6 +32,7 @@ AnkiConnect → Anki 桌面版
 
 - macOS（当前一键安装脚本只支持 Mac）
 - [Python 3](https://www.python.org/downloads/macos/)
+- 可选：Xcode Command Line Tools，用于构建原生快速窗口；缺少时自动使用浏览器备用窗口
 - [Anki 桌面版](https://apps.ankiweb.net/)
 - Chromium 浏览器：Arc、Chrome 或 Edge
 - [OpenAI API Key](https://platform.openai.com/api-keys)；API 费用与 ChatGPT 订阅相互独立
@@ -64,6 +67,7 @@ AnkiConnect 的项目说明与源码见 [AnkiConnect](https://git.sr.ht/~foosoft
 
 - 把公开程序文件复制到 `~/Library/Application Support/Wordflow`
 - 注册一个只在本机运行的后台服务
+- 在本机具备 Swift 编译器时构建原生快速输入窗
 - 打开已安装的 Wordflow 文件夹
 
 如果 macOS 阻止运行，请按住 Control 点击文件，选择 **打开**，再确认一次。
@@ -94,12 +98,23 @@ Edge 的步骤相同，入口是 `edge://extensions`。
 
 - 在网页选中单词，右键选择 **加入 Anki**。
 - `Option + Shift + A`：把浏览器当前选中的单词直接加入 Anki。
-- `Option + Shift + W`：打开独立手动输入窗。只要 Arc/Chrome 正在运行，即使焦点在 Word、PDF 或其他 App，也可以使用。
-- 点击扩展图标：检查本地服务和 Anki 状态，或手动输入单词与上下文。
+- `Option + Shift + W`：打开原生快速输入窗。只要 Arc/Chrome 正在运行，即使焦点在 Word、PDF 或其他 App，也可以使用。
+- 点击扩展图标：同样打开快速输入窗。
 
 如快捷键冲突，可在 `arc://extensions/shortcuts` 或 `chrome://extensions/shortcuts` 修改，并把手动输入命令的作用域设为 **Global**。
 
 新卡会出现在 Anki 的 `Vocabulary Inbox` 牌组。也可在 Anki 的 **Browse** 中搜索单词。
+
+### 快速输入窗的键盘操作
+
+- 打开窗口时，光标自动落在“单词或短语”。
+- 在单词框按 `↓` 或 `Tab`：进入上下文。
+- 在上下文按 `Tab`：进入“加入 Anki”按钮；按 `Shift + Tab` 返回单词框。
+- 在单词框按 `Enter`，或在任意位置按 `Command + Enter`：生成并保存。
+- `Command + P`：切换“置顶”。窗口会记住这个选择。
+- `Esc`：收起窗口。
+
+原生窗口保留 macOS 的关闭、最小化和缩放按钮。默认尺寸只包裹录词所需内容，也允许在合理范围内调整并记住尺寸。
 
 ## Word 和桌面 PDF
 
@@ -122,6 +137,8 @@ Edge 的步骤相同，入口是 `edge://extensions`。
 ```
 
 默认使用 OpenAI `gpt-5.6-luna`，适合高频、成本敏感的结构化制卡。可以修改 `OPENAI_MODEL`。项目使用 Responses API 且设置 `store: false`。
+
+为缩短简单制卡任务的等待时间，默认设置 `OPENAI_REASONING_EFFORT=none`；如更重视复杂语义分析，可改为 `low`。本地服务还会缓存已经确认过的 Anki 牌组与 Note Type，避免每次重复检查。
 
 可选开启发音音频：
 
@@ -189,6 +206,7 @@ python3 -m unittest discover -s local_service/tests -v
 node --check extension/service-worker.js
 node --check extension/content.js
 node --check extension/popup.js
+native/build-app.sh
 ```
 
 离线 mock 测试：

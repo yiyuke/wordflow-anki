@@ -7,15 +7,14 @@ async function getServiceUrl() {
 }
 
 async function checkHealth() {
-  const health = $("#health");
   try {
     const response = await fetch(`${await getServiceUrl()}/health`);
     const data = await response.json();
-    health.textContent = data.anki?.ok ? "服务与 Anki 正常" : "服务正常，Anki 未连接";
-    health.className = data.anki?.ok ? "status ok" : "status bad";
+    if (!data.anki?.ok) throw new Error("请先打开 Anki");
   } catch (_error) {
-    health.textContent = "本地服务未启动";
-    health.className = "status bad";
+    const result = $("#result");
+    result.className = "error";
+    result.textContent = _error.message || "Wordflow 本地服务未启动";
   }
 }
 
@@ -55,14 +54,25 @@ async function addWord() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  $("#serviceUrl").value = await getServiceUrl();
-  await checkHealth();
+  $("#word").focus();
+  checkHealth();
 });
 $("#add").addEventListener("click", addWord);
 $("#word").addEventListener("keydown", (event) => {
-  if (event.key === "Enter") addWord();
+  if (event.key === "Enter") {
+    event.preventDefault();
+    addWord();
+  } else if (event.key === "ArrowDown") {
+    event.preventDefault();
+    $("#context").focus();
+  }
 });
-$("#save").addEventListener("click", async () => {
-  await chrome.storage.sync.set({ serviceUrl: $("#serviceUrl").value.trim() || DEFAULT_SERVICE_URL });
-  await checkHealth();
+$("#context").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault();
+    addWord();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") window.close();
 });

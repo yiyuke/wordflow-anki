@@ -58,15 +58,32 @@ async function capture(payload, tabId) {
 }
 
 async function openManualInput() {
-  const popupUrl = chrome.runtime.getURL("popup.html");
+  const { serviceUrl } = await settings();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1500);
+  try {
+    const response = await fetch(`${serviceUrl.replace(/\/$/, "")}/api/window/open`, {
+      method: "POST",
+      signal: controller.signal
+    });
+    const data = await response.json();
+    if (response.ok && data.ok) return;
+  } catch (_error) {
+    // The browser window below keeps manual capture usable without the native companion.
+  } finally {
+    clearTimeout(timeout);
+  }
+
   await chrome.windows.create({
-    url: popupUrl,
+    url: chrome.runtime.getURL("popup.html"),
     type: "popup",
-    width: 380,
-    height: 520,
+    width: 460,
+    height: 410,
     focused: true
   });
 }
+
+chrome.action.onClicked.addListener(() => openManualInput());
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== MENU_ID) return;

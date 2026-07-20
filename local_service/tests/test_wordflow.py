@@ -1,8 +1,11 @@
+import json
 import os
 import re
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 
 SERVICE_DIR = Path(__file__).resolve().parents[1]
@@ -12,6 +15,7 @@ from wordflow import (  # noqa: E402
     AnkiClient,
     CARD_CSS,
     Config,
+    OpenAICardGenerator,
     WordflowApp,
     extract_response_text,
     html_items,
@@ -36,6 +40,7 @@ def mock_config() -> Config:
         port=0,
         openai_api_key="",
         openai_model="mock-model",
+        openai_reasoning_effort="none",
         openai_base_url="https://example.invalid/v1",
         anki_url="http://127.0.0.1:8765",
         anki_api_key="",
@@ -89,6 +94,51 @@ class WordflowTests(unittest.TestCase):
         self.assertFalse(first["duplicate"])
         self.assertTrue(second["duplicate"])
         self.assertIn("[…]", first["card"]["context_cloze"])
+
+    def test_anki_model_check_is_cached(self):
+        client = AnkiClient(replace(mock_config(), mock_anki=False))
+        calls = []
+
+        def invoke(action, **_params):
+            calls.append(action)
+            return {"deckNames": ["Test Deck"], "modelNames": ["Test Model"]}[action]
+
+        client.invoke = invoke
+        client.ensure_model()
+        client.ensure_model()
+        self.assertEqual(calls, ["deckNames", "modelNames"])
+
+    def test_generation_uses_latency_reasoning_setting(self):
+        capture = normalize_capture({"text": "lucid", "context": "A lucid explanation."})
+        card = {
+            "word": "lucid",
+            "lemma": "lucid",
+            "pronunciation": "/ˈluːsɪd/",
+            "part_of_speech": "adjective",
+            "meaning_zh": "清晰的",
+            "definition_en": "clear and easy to understand",
+            "context": capture["context"],
+            "context_cloze": "A […] explanation.",
+            "collocations": ["lucid explanation", "lucid account"],
+            "etymology": "from Latin lucidus",
+            "memory_hook": "Think of light making an idea clear.",
+            "examples": ["Her answer was lucid.", "He gave a lucid account."],
+            "tags": ["adjective"],
+        }
+        response = {
+            "output": [
+                {
+                    "type": "message",
+                    "content": [{"type": "output_text", "text": json.dumps(card)}],
+                }
+            ]
+        }
+        config = replace(mock_config(), mock_openai=False, openai_api_key="test-key")
+        with patch("wordflow._request_json", return_value=response) as request_json:
+            OpenAICardGenerator(config).generate(capture)
+        payload = request_json.call_args.args[1]
+        self.assertEqual(payload["reasoning"], {"effort": "none"})
+        self.assertEqual(payload["max_output_tokens"], 1400)
 
     def test_card_colors_meet_aa_contrast_in_light_and_dark_modes(self):
         light_block = re.search(r"\.card\s*\{(.*?)\n\}", CARD_CSS, re.DOTALL)
