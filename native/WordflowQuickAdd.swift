@@ -2,6 +2,22 @@ import AppKit
 import Darwin
 import Foundation
 
+private final class InputSurfaceView: NSView {
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        layer?.backgroundColor = NSColor(
+            calibratedWhite: isDark ? 0.16 : 0.96,
+            alpha: 1
+        ).cgColor
+        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(isDark ? 0.9 : 0.65).cgColor
+        layer?.borderWidth = 1
+        layer?.cornerRadius = 9
+        layer?.masksToBounds = true
+    }
+}
+
 private final class QuickAddWindow: NSWindow {
     var submitHandler: (() -> Void)?
     var deckHandler: (() -> Void)?
@@ -23,7 +39,7 @@ private final class QuickAddWindow: NSWindow {
             deckHandler?()
             return
         }
-        if modifiers.contains(.command), event.keyCode == 36 || event.keyCode == 76 {
+        if modifiers.contains(.command) && (event.keyCode == 36 || event.keyCode == 76) {
             submitHandler?()
             return
         }
@@ -37,7 +53,7 @@ private final class ContextTextView: NSTextView {
 
     override func keyDown(with event: NSEvent) {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if modifiers.contains(.command), event.keyCode == 36 || event.keyCode == 76 {
+        if modifiers.contains(.command) && (event.keyCode == 36 || event.keyCode == 76) {
             submitHandler?()
             return
         }
@@ -71,6 +87,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var keyMonitor: Any?
     private var showSignalSource: DispatchSourceSignal?
     private var previousApplication: NSRunningApplication?
+    private var availableDecks: [String] = []
+    private var activeDeck = "Vocabulary Inbox"
     private var isLoadingDecks = false
     private var isSubmitting = false
 
@@ -102,17 +120,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func buildWindow() {
         window = QuickAddWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 476, height: 350),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 394),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Wordflow Quick Add"
-        window.minSize = NSSize(width: 440, height: 330)
-        window.maxSize = NSSize(width: 640, height: 500)
+        window.minSize = NSSize(width: 468, height: 374)
+        window.maxSize = NSSize(width: 660, height: 540)
         window.isReleasedWhenClosed = false
         window.delegate = self
-        window.setFrameAutosaveName("WordflowQuickAddWindowV2")
+        window.setFrameAutosaveName("WordflowQuickAddWindowV3")
         window.submitHandler = { [weak self] in self?.submit(returnAfterSave: true) }
         window.deckHandler = { [weak self] in self?.showDeckMenu() }
         window.pinHandler = { [weak self] in self?.togglePin() }
@@ -142,43 +160,56 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         header.alignment = .centerY
         header.spacing = 12
 
-        let wordLabel = label("单词或短语", size: 13, weight: .semibold, color: .labelColor)
+        let wordLabel = label("单词或短语", size: 14, weight: .semibold, color: .labelColor)
         let wordHeaderSpacer = NSView()
         wordHeaderSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let deckLabel = label("保存到", size: 12, weight: .medium, color: .secondaryLabelColor)
-        deckButton = NSPopUpButton(frame: .zero, pullsDown: false)
-        deckButton.controlSize = .small
-        deckButton.font = .systemFont(ofSize: 12, weight: .medium)
-        deckButton.target = self
-        deckButton.action = #selector(deckChanged)
+        let deckLabel = label("保存到牌组", size: 14, weight: .semibold, color: .labelColor)
+        deckButton = NSPopUpButton(frame: .zero, pullsDown: true)
+        deckButton.controlSize = .regular
+        deckButton.font = .systemFont(ofSize: 14, weight: .medium)
         deckButton.addItem(withTitle: "读取牌组…")
         deckButton.isEnabled = false
         deckButton.setAccessibilityIdentifier("deckButton")
         deckButton.setAccessibilityLabel("保存到 Anki 牌组")
-        deckButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 138).isActive = true
-        deckButton.widthAnchor.constraint(lessThanOrEqualToConstant: 210).isActive = true
+        deckButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 164).isActive = true
+        deckButton.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
+        deckButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
         let deckControl = NSStackView(views: [deckLabel, deckButton])
         deckControl.orientation = .horizontal
         deckControl.alignment = .centerY
-        deckControl.spacing = 6
+        deckControl.spacing = 9
         let wordHeader = NSStackView(views: [wordLabel, wordHeaderSpacer, deckControl])
         wordHeader.orientation = .horizontal
         wordHeader.alignment = .centerY
-        wordHeader.spacing = 10
+        wordHeader.spacing = 16
         wordField = NSTextField()
         wordField.placeholderString = "例如：serendipity"
         wordField.font = .systemFont(ofSize: 16)
         wordField.delegate = self
-        wordField.focusRingType = .default
+        wordField.isBezeled = false
+        wordField.drawsBackground = false
+        wordField.focusRingType = .none
+        wordField.usesSingleLineMode = true
         wordField.setAccessibilityIdentifier("wordField")
+        wordField.translatesAutoresizingMaskIntoConstraints = false
 
-        let contextLabel = label("例句或上下文（可选）", size: 13, weight: .semibold, color: .labelColor)
+        let wordSurface = InputSurfaceView()
+        wordSurface.translatesAutoresizingMaskIntoConstraints = false
+        wordSurface.addSubview(wordField)
+        NSLayoutConstraint.activate([
+            wordField.leadingAnchor.constraint(equalTo: wordSurface.leadingAnchor, constant: 12),
+            wordField.trailingAnchor.constraint(equalTo: wordSurface.trailingAnchor, constant: -12),
+            wordField.centerYAnchor.constraint(equalTo: wordSurface.centerYAnchor)
+        ])
+
+        let contextLabel = label("例句或上下文（可选）", size: 14, weight: .semibold, color: .labelColor)
         contextView = ContextTextView()
         contextView.font = .systemFont(ofSize: 15)
         contextView.isRichText = false
+        contextView.drawsBackground = false
         contextView.isAutomaticQuoteSubstitutionEnabled = false
         contextView.isAutomaticDashSubstitutionEnabled = false
-        contextView.textContainerInset = NSSize(width: 8, height: 7)
+        contextView.textContainerInset = NSSize(width: 10, height: 9)
         contextView.setAccessibilityLabel("例句或上下文，可选")
         contextView.setAccessibilityIdentifier("contextField")
         contextView.focusWordHandler = { [weak self] in self?.focusWord() }
@@ -186,12 +217,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         contextView.submitHandler = { [weak self] in self?.submit(returnAfterSave: true) }
 
         let contextScroll = NSScrollView()
-        contextScroll.borderType = .bezelBorder
+        contextScroll.borderType = .noBorder
+        contextScroll.drawsBackground = false
         contextScroll.hasVerticalScroller = true
         contextScroll.autohidesScrollers = true
         contextScroll.documentView = contextView
         contextScroll.translatesAutoresizingMaskIntoConstraints = false
-        contextScroll.heightAnchor.constraint(equalToConstant: 82).isActive = true
+
+        let contextSurface = InputSurfaceView()
+        contextSurface.translatesAutoresizingMaskIntoConstraints = false
+        contextSurface.addSubview(contextScroll)
+        NSLayoutConstraint.activate([
+            contextScroll.leadingAnchor.constraint(equalTo: contextSurface.leadingAnchor, constant: 1),
+            contextScroll.trailingAnchor.constraint(equalTo: contextSurface.trailingAnchor, constant: -1),
+            contextScroll.topAnchor.constraint(equalTo: contextSurface.topAnchor, constant: 1),
+            contextScroll.bottomAnchor.constraint(equalTo: contextSurface.bottomAnchor, constant: -1)
+        ])
 
         progress = NSProgressIndicator()
         progress.style = .spinning
@@ -211,7 +252,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         statusRow.detachesHiddenViews = true
         statusRow.heightAnchor.constraint(equalToConstant: 18).isActive = true
 
-        let hint = label("Tab 移动 · ⌘D 牌组 · ⌘↩ 保存返回 · Esc 返回", size: 12, weight: .medium, color: .secondaryLabelColor)
+        let hint = label("↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存关闭 · Esc 关闭", size: 12, weight: .medium, color: .secondaryLabelColor)
         addButton = NSButton(title: "加入 Anki", target: self, action: #selector(addClicked))
         addButton.bezelStyle = .rounded
         addButton.controlSize = .large
@@ -228,16 +269,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         footer.alignment = .centerY
         footer.spacing = 12
 
-        let stack = NSStackView(views: [header, wordHeader, wordField, contextLabel, contextScroll, statusRow, footer])
+        let stack = NSStackView(views: [header, wordHeader, wordSurface, contextLabel, contextSurface, statusRow, footer])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
-        stack.setCustomSpacing(18, after: header)
-        stack.setCustomSpacing(5, after: wordHeader)
-        stack.setCustomSpacing(12, after: wordField)
-        stack.setCustomSpacing(5, after: contextLabel)
-        stack.setCustomSpacing(9, after: contextScroll)
+        stack.setCustomSpacing(20, after: header)
+        stack.setCustomSpacing(9, after: wordHeader)
+        stack.setCustomSpacing(18, after: wordSurface)
+        stack.setCustomSpacing(9, after: contextLabel)
+        stack.setCustomSpacing(10, after: contextSurface)
 
         content.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -247,9 +288,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18),
             header.widthAnchor.constraint(equalTo: stack.widthAnchor),
             wordHeader.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            wordField.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            wordField.heightAnchor.constraint(equalToConstant: 36),
-            contextScroll.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            wordSurface.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            wordSurface.heightAnchor.constraint(equalToConstant: 42),
+            contextSurface.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            contextSurface.heightAnchor.constraint(equalToConstant: 88),
             statusRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
             footer.widthAnchor.constraint(equalTo: stack.widthAnchor)
         ])
@@ -284,7 +326,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 NSApp.terminate(nil)
                 return nil
             }
-            if modifiers.contains(.command), event.keyCode == 36 || event.keyCode == 76 {
+            if modifiers.contains(.command) && (event.keyCode == 36 || event.keyCode == 76) {
                 self.submit(returnAfterSave: true)
                 return nil
             }
@@ -297,6 +339,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         field.font = .systemFont(ofSize: size, weight: weight)
         field.textColor = color
         return field
+    }
+
+    private func shortMessage(for error: Error) -> String {
+        let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if message.contains("Anki 启动失败") {
+            return "Anki 启动失败，请手动打开"
+        }
+        if message.contains("AnkiConnect") || message.contains("Anki 未连接") || message.contains("连接中断") {
+            return "Anki 未连接，请稍后重试"
+        }
+        if message.contains("OPENAI_API_KEY") || message.localizedCaseInsensitiveContains("API Key") {
+            return "请先配置 OpenAI API Key"
+        }
+        if message.localizedCaseInsensitiveContains("OpenAI") || message.contains("网络连接失败") {
+            return "网络连接失败，请稍后重试"
+        }
+        if message.localizedCaseInsensitiveContains("could not connect") || message.contains("无法连接本地服务") {
+            return "Wordflow 服务未连接"
+        }
+        guard message.count > 42 else { return message }
+        return String(message.prefix(41)) + "…"
     }
 
     private func installShowSignalHandler() {
@@ -386,7 +449,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func selectedDeck() -> String {
-        deckButton.selectedItem?.title ?? "Vocabulary Inbox"
+        activeDeck
+    }
+
+    private func configureDeckButton(decks: [String], selected: String, enabled: Bool = true) {
+        availableDecks = decks
+        activeDeck = selected
+        deckButton.removeAllItems()
+
+        let displayItem = NSMenuItem(title: selected, action: nil, keyEquivalent: "")
+        displayItem.state = .on
+        deckButton.menu?.addItem(displayItem)
+        deckButton.menu?.addItem(.separator())
+
+        for deck in decks {
+            let item = NSMenuItem(title: deck, action: #selector(deckChosen(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = deck
+            item.state = deck == selected ? .on : .off
+            deckButton.menu?.addItem(item)
+        }
+        deckButton.isEnabled = enabled
     }
 
     private func serviceRequest(path: String, method: String = "GET", payload: [String: Any]? = nil) -> URLRequest? {
@@ -422,24 +505,19 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                     )
                 }
                 let selected = json?["selected"] as? String ?? decks[0]
-                deckButton.removeAllItems()
-                deckButton.addItems(withTitles: decks)
-                deckButton.selectItem(withTitle: selected)
-                deckButton.isEnabled = true
+                configureDeckButton(decks: decks, selected: selected)
             } catch {
-                if deckButton.numberOfItems == 0 || deckButton.itemTitles == ["读取牌组…"] {
-                    deckButton.removeAllItems()
-                    deckButton.addItem(withTitle: "Vocabulary Inbox")
-                }
-                deckButton.isEnabled = false
+                let fallback = availableDecks.isEmpty ? [activeDeck] : availableDecks
+                configureDeckButton(decks: fallback, selected: activeDeck, enabled: false)
                 statusLabel.textColor = .systemRed
-                statusLabel.stringValue = error.localizedDescription
+                statusLabel.stringValue = shortMessage(for: error)
             }
         }
     }
 
-    @objc private func deckChanged() {
-        let deck = selectedDeck()
+    @objc private func deckChosen(_ sender: NSMenuItem) {
+        guard let deck = sender.representedObject as? String else { return }
+        configureDeckButton(decks: availableDecks, selected: deck)
         focusWord()
         guard let request = serviceRequest(
             path: "/api/decks/select",
@@ -460,7 +538,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 }
             } catch {
                 statusLabel.textColor = .systemRed
-                statusLabel.stringValue = error.localizedDescription
+                statusLabel.stringValue = shortMessage(for: error)
             }
         }
     }
@@ -472,14 +550,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             return true
         }
         if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-            submit(returnAfterSave: false)
+            let modifiers = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
+            submit(returnAfterSave: modifiers.contains(.command))
             return true
         }
         return false
     }
 
     @objc private func addClicked() {
-        submit(returnAfterSave: false)
+        let modifiers = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
+        submit(returnAfterSave: modifiers.contains(.command))
     }
 
     @objc private func pinClicked() {
@@ -566,7 +646,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                     focusWord()
                 }
             } catch {
-                finishSubmission(message: error.localizedDescription, success: false)
+                finishSubmission(message: shortMessage(for: error), success: false)
             }
         }
     }

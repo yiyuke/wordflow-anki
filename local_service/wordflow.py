@@ -290,10 +290,8 @@ def _request_json(
                 time.sleep(0.35 * (attempt + 1))
                 continue
             if service_name == "AnkiConnect":
-                raise RuntimeError(
-                    "AnkiConnect 连接中断；请确认 Anki 已完全启动，并已安装和启用 AnkiConnect"
-                ) from error
-            raise RuntimeError(f"{service_name} 暂时断开了连接；自动重试后仍未恢复，请检查网络后再试") from error
+                raise RuntimeError("Anki 未连接") from error
+            raise RuntimeError("网络连接失败，请稍后重试") from error
 
     raise RuntimeError(f"{service_name} 请求失败")
 
@@ -546,6 +544,41 @@ class AnkiClient:
         self._model_ready = False
         self._known_decks: set[str] = set()
         self._model_lock = threading.Lock()
+        self._launch_lock = threading.Lock()
+
+    def _launch_anki_and_wait(self) -> bool:
+        if sys.platform != "darwin":
+            return False
+        with self._launch_lock:
+            try:
+                subprocess.Popen(
+                    ["/usr/bin/open", "-g", "-b", "net.ankiweb.launcher"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            except OSError:
+                return False
+
+            payload: Dict[str, Any] = {"action": "version", "version": 6, "params": {}}
+            if self.config.anki_api_key:
+                payload["key"] = self.config.anki_api_key
+            for _ in range(20):
+                time.sleep(0.5)
+                try:
+                    response = _request_json(
+                        self.config.anki_url,
+                        payload,
+                        {},
+                        timeout=2,
+                        service_name="AnkiConnect",
+                        bypass_proxy=True,
+                    )
+                    if response.get("error") is None:
+                        return True
+                except RuntimeError:
+                    continue
+            return False
 
     def invoke(self, action: str, **params: Any) -> Any:
         payload: Dict[str, Any] = {"action": action, "version": 6, "params": params}
@@ -559,15 +592,31 @@ class AnkiClient:
             "notesInfo",
             "cardsInfo",
         }
-        response = _request_json(
-            self.config.anki_url,
-            payload,
-            {},
-            timeout=15,
-            service_name="AnkiConnect",
-            retries=1 if safe_to_retry else 0,
-            bypass_proxy=True,
-        )
+        try:
+            response = _request_json(
+                self.config.anki_url,
+                payload,
+                {},
+                timeout=15,
+                service_name="AnkiConnect",
+                retries=1 if safe_to_retry else 0,
+                bypass_proxy=True,
+            )
+        except RuntimeError as error:
+            if safe_to_retry and str(error) == "Anki 未连接":
+                if not self._launch_anki_and_wait():
+                    raise RuntimeError("Anki 启动失败，请手动打开") from error
+                response = _request_json(
+                    self.config.anki_url,
+                    payload,
+                    {},
+                    timeout=15,
+                    service_name="AnkiConnect",
+                    retries=1,
+                    bypass_proxy=True,
+                )
+            else:
+                raise
         if response.get("error") is not None:
             raise RuntimeError(f"AnkiConnect：{response['error']}")
         return response.get("result")

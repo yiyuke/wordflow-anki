@@ -217,7 +217,7 @@ class WordflowTests(unittest.TestCase):
             ) as urlopen,
             patch("wordflow.time.sleep") as sleep,
         ):
-            with self.assertRaisesRegex(RuntimeError, "OpenAI.*自动重试"):
+            with self.assertRaisesRegex(RuntimeError, "网络连接失败，请稍后重试"):
                 _request_json(
                     "https://example.invalid/v1/responses",
                     {"input": "test"},
@@ -233,7 +233,7 @@ class WordflowTests(unittest.TestCase):
             "wordflow.DIRECT_OPENER.open",
             side_effect=RemoteDisconnected("Remote end closed connection without response"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "AnkiConnect.*Anki 已完全启动"):
+            with self.assertRaisesRegex(RuntimeError, "Anki 未连接"):
                 _request_json(
                     "http://127.0.0.1:8765",
                     {"action": "version", "version": 6},
@@ -241,6 +241,24 @@ class WordflowTests(unittest.TestCase):
                     service_name="AnkiConnect",
                     bypass_proxy=True,
                 )
+
+    def test_safe_anki_request_launches_app_and_retries(self):
+        client = AnkiClient(replace(mock_config(), mock_anki=False))
+        responses = [
+            RuntimeError("Anki 未连接"),
+            {"result": 6, "error": None},
+            {"result": ["Default"], "error": None},
+        ]
+        with (
+            patch("wordflow.sys.platform", "darwin"),
+            patch("wordflow._request_json", side_effect=responses) as request_json,
+            patch("wordflow.subprocess.Popen") as launch,
+            patch("wordflow.time.sleep") as sleep,
+        ):
+            self.assertEqual(client.invoke("deckNames"), ["Default"])
+        launch.assert_called_once()
+        sleep.assert_called_once_with(0.5)
+        self.assertEqual(request_json.call_count, 3)
 
     def test_anki_requests_explicitly_bypass_system_proxy(self):
         client = AnkiClient(replace(mock_config(), mock_anki=False))

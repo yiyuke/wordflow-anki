@@ -1,6 +1,18 @@
 const MENU_ID = "wordflow-add-to-anki";
 const DEFAULT_SERVICE_URL = "http://127.0.0.1:8766";
 
+function friendlyMessage(error) {
+  const message = String(error?.message || error || "操作失败").trim();
+  if (message.includes("Anki 启动失败")) return "Anki 启动失败，请手动打开";
+  if (message.includes("AnkiConnect") || message.includes("Anki 未连接") || message.includes("连接中断")) {
+    return "Anki 未连接，请稍后重试";
+  }
+  if (/OPENAI_API_KEY|API Key/i.test(message)) return "请先配置 OpenAI API Key";
+  if (/OpenAI|网络连接失败/i.test(message)) return "网络连接失败，请稍后重试";
+  if (/Failed to fetch|could not connect|本地服务/i.test(message)) return "Wordflow 服务未连接";
+  return message.length > 42 ? `${message.slice(0, 41)}…` : message;
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
@@ -55,7 +67,7 @@ async function capture(payload, tabId) {
     }
     return data;
   } catch (error) {
-    await showResult(tabId, `加入失败：${error.message}`, "error");
+    await showResult(tabId, friendlyMessage(error), "error");
     throw error;
   }
 }
@@ -86,7 +98,7 @@ async function openManualInput() {
     url: chrome.runtime.getURL("popup.html"),
     type: "popup",
     width: 460,
-    height: 455,
+    height: 520,
     focused: true
   });
 }

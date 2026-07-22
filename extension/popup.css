@@ -10,11 +10,13 @@ main { box-sizing: border-box; max-width: 520px; margin: 0 auto; padding: 22px; 
 header { margin-bottom: 18px; }
 h1 { margin: 0; font-size: 21px; letter-spacing: -.35px; }
 header p { margin: 4px 0 0; color: #067647; font-size: 13px; font-weight: 700; }
-label { display: block; margin: 13px 0 6px; color: #344054; font-size: 13px; font-weight: 700; }
+label { display: block; margin: 16px 0 8px; color: #344054; font-size: 14px; font-weight: 700; }
 input, textarea, select {
   box-sizing: border-box; width: 100%; border: 1px solid #d0d5dd; border-radius: 9px;
-  padding: 9px 10px; background: white; color: #101828; font: inherit; resize: vertical;
+  padding: 9px 11px; background: #f2f4f7; color: #101828; font: inherit; resize: vertical;
 }
+input, select { height: 42px; }
+textarea { min-height: 88px; }
 input:focus, textarea:focus, select:focus { outline: 2px solid #a6f4c5; border-color: #12b76a; }
 input::placeholder, textarea::placeholder { color: #98a2b3; opacity: 1; }
 select:disabled { opacity: .65; }
@@ -23,7 +25,10 @@ button {
   background: #067647; color: white; font-weight: 700; cursor: pointer;
 }
 button:disabled { opacity: .55; cursor: wait; }
-#result { min-height: 18px; margin: 10px 0 4px; color: #067647; font-size: 12px; }
+#result {
+  min-height: 18px; margin: 10px 0 4px; color: #067647; font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 #result.error { color: #b42318; }
 .hint { margin: 0; color: #667085; font-size: 12px; font-weight: 600; }
 
