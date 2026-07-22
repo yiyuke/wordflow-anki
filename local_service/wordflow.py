@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import getpass
 import hashlib
 import html
 import http.client
@@ -64,9 +65,14 @@ def keychain_secret(service: str) -> str:
     """Read a local macOS Keychain generic password without printing it."""
     if sys.platform != "darwin":
         return ""
+    account = getpass.getuser().strip()
+    command = ["security", "find-generic-password"]
+    if account:
+        command.extend(["-a", account])
+    command.extend(["-s", service, "-w"])
     try:
         result = subprocess.run(
-            ["security", "find-generic-password", "-s", service, "-w"],
+            command,
             check=True,
             capture_output=True,
             text=True,
@@ -116,6 +122,68 @@ class Config:
             mock_openai=env_bool("MOCK_OPENAI"),
             mock_anki=env_bool("MOCK_ANKI"),
         )
+
+
+class Preferences:
+    def __init__(self, path: Optional[Path]):
+        self.path = path
+        self._lock = threading.RLock()
+        self._data: Dict[str, Any] = {}
+        if path and path.exists():
+            try:
+                loaded = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    self._data = loaded
+            except (OSError, json.JSONDecodeError):
+                self._data = {}
+
+    def _save(self) -> None:
+        if not self.path:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
+        temporary.write_text(
+            json.dumps(self._data, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(self.path)
+
+    def default_deck(self, fallback: str) -> str:
+        with self._lock:
+            value = str(self._data.get("default_deck", "")).strip()
+            return value or fallback
+
+    def known_decks(self, fallback: str) -> List[str]:
+        with self._lock:
+            values = self._data.get("known_decks", [])
+            decks = [str(item).strip() for item in values if str(item).strip()] if isinstance(values, list) else []
+            return decks or [fallback]
+
+    def remember_decks(self, decks: Iterable[str]) -> None:
+        cleaned = sorted({str(deck).strip() for deck in decks if str(deck).strip()}, key=str.casefold)
+        if not cleaned:
+            return
+        with self._lock:
+            if self._data.get("known_decks") == cleaned:
+                return
+            self._data["known_decks"] = cleaned
+            self._save()
+
+    def set_default_deck(self, deck_name: str) -> None:
+        with self._lock:
+            if self._data.get("default_deck") == deck_name:
+                return
+            self._data["default_deck"] = deck_name
+            self._save()
+
+
+def normalize_deck_name(value: Any) -> str:
+    deck_name = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not deck_name:
+        raise ValueError("请选择一个 Anki 牌组")
+    if len(deck_name) > 200:
+        raise ValueError("牌组名称过长")
+    return deck_name
 
 
 CARD_SCHEMA: Dict[str, Any] = {
@@ -476,13 +544,21 @@ class AnkiClient:
         self.config = config
         self.mock_notes: Dict[str, int] = {}
         self._model_ready = False
+        self._known_decks: set[str] = set()
         self._model_lock = threading.Lock()
 
     def invoke(self, action: str, **params: Any) -> Any:
         payload: Dict[str, Any] = {"action": action, "version": 6, "params": params}
         if self.config.anki_api_key:
             payload["key"] = self.config.anki_api_key
-        safe_to_retry = action in {"version", "deckNames", "modelNames", "findNotes"}
+        safe_to_retry = action in {
+            "version",
+            "deckNames",
+            "modelNames",
+            "findNotes",
+            "notesInfo",
+            "cardsInfo",
+        }
         response = _request_json(
             self.config.anki_url,
             payload,
@@ -504,47 +580,76 @@ class AnkiClient:
         except Exception as error:  # health must stay informative
             return {"ok": False, "error": str(error)}
 
-    def ensure_model(self) -> None:
+    def deck_names(self) -> List[str]:
+        if self.config.mock_anki:
+            return [self.config.deck_name]
+        decks = [str(deck) for deck in self.invoke("deckNames")]
+        self._known_decks.update(decks)
+        return sorted(decks, key=str.casefold)
+
+    def ensure_model(self, deck_name: Optional[str] = None) -> None:
         if self.config.mock_anki:
             return
-        if self._model_ready:
-            return
+        target_deck = deck_name or self.config.deck_name
         with self._model_lock:
-            if self._model_ready:
-                return
-            decks = self.invoke("deckNames")
-            if self.config.deck_name not in decks:
-                self.invoke("createDeck", deck=self.config.deck_name)
-            models = self.invoke("modelNames")
-            if self.config.model_name not in models:
-                self.invoke(
-                    "createModel",
-                    modelName=self.config.model_name,
-                    inOrderFields=NOTE_FIELDS,
-                    css=CARD_CSS,
-                    isCloze=False,
-                    cardTemplates=CARD_TEMPLATES,
-                )
-            self._model_ready = True
+            if target_deck not in self._known_decks:
+                decks = [str(deck) for deck in self.invoke("deckNames")]
+                self._known_decks.update(decks)
+                if target_deck not in self._known_decks:
+                    if target_deck != self.config.deck_name:
+                        raise RuntimeError(f"Anki 牌组不存在：{target_deck}")
+                    self.invoke("createDeck", deck=target_deck)
+                    self._known_decks.add(target_deck)
+            if not self._model_ready:
+                models = self.invoke("modelNames")
+                if self.config.model_name not in models:
+                    self.invoke(
+                        "createModel",
+                        modelName=self.config.model_name,
+                        inOrderFields=NOTE_FIELDS,
+                        css=CARD_CSS,
+                        isCloze=False,
+                        cardTemplates=CARD_TEMPLATES,
+                    )
+                self._model_ready = True
+
+    def note_deck(self, note_id: int) -> str:
+        notes = self.invoke("notesInfo", notes=[note_id]) or []
+        card_ids = notes[0].get("cards", []) if notes else []
+        if not card_ids:
+            return ""
+        cards = self.invoke("cardsInfo", cards=card_ids) or []
+        return str(cards[0].get("deckName", "")) if cards else ""
 
     def add_card(
         self,
         card: Dict[str, Any],
         capture: Dict[str, str],
         audio: Optional[bytes] = None,
+        deck_name: Optional[str] = None,
     ) -> Dict[str, Any]:
+        target_deck = deck_name or self.config.deck_name
         dedupe_tag = identity_tag(card)
         if self.config.mock_anki:
             if dedupe_tag in self.mock_notes:
-                return {"duplicate": True, "note_id": self.mock_notes[dedupe_tag]}
+                return {
+                    "duplicate": True,
+                    "note_id": self.mock_notes[dedupe_tag],
+                    "deck": target_deck,
+                }
             note_id = len(self.mock_notes) + 1
             self.mock_notes[dedupe_tag] = note_id
-            return {"duplicate": False, "note_id": note_id}
+            return {"duplicate": False, "note_id": note_id, "deck": target_deck}
 
-        self.ensure_model()
+        self.ensure_model(target_deck)
         existing = self.invoke("findNotes", query=f"tag:{dedupe_tag}")
         if existing:
-            return {"duplicate": True, "note_id": existing[0]}
+            existing_deck = self.note_deck(existing[0]) or "Anki"
+            return {
+                "duplicate": True,
+                "note_id": existing[0],
+                "deck": existing_deck,
+            }
 
         tags = ["wordflow", dedupe_tag]
         source_tag = safe_tag(capture["source_type"])
@@ -570,7 +675,7 @@ class AnkiClient:
             "Audio": "",
         }
         note: Dict[str, Any] = {
-            "deckName": self.config.deck_name,
+            "deckName": target_deck,
             "modelName": self.config.model_name,
             "fields": fields,
             # Duplicates are controlled by the lemma+part-of-speech identity tag.
@@ -588,14 +693,38 @@ class AnkiClient:
                 }
             ]
         note_id = self.invoke("addNote", note=note)
-        return {"duplicate": False, "note_id": note_id}
+        return {"duplicate": False, "note_id": note_id, "deck": target_deck}
 
 
 class WordflowApp:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, preferences_path: Optional[Path] = None):
         self.config = config
         self.generator = OpenAICardGenerator(config)
         self.anki = AnkiClient(config)
+        if preferences_path is None and not config.mock_anki:
+            preferences_path = ROOT / "preferences.json"
+        self.preferences = Preferences(preferences_path)
+
+    def decks(self) -> Dict[str, Any]:
+        selected = self.preferences.default_deck(self.config.deck_name)
+        stale = False
+        try:
+            decks = self.anki.deck_names()
+            self.preferences.remember_decks(decks)
+        except Exception:
+            decks = self.preferences.known_decks(self.config.deck_name)
+            stale = True
+        if selected not in decks:
+            selected = self.config.deck_name if self.config.deck_name in decks else decks[0]
+        return {"decks": decks, "selected": selected, "stale": stale}
+
+    def select_deck(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        deck_name = normalize_deck_name(payload.get("deck"))
+        available = self.decks()
+        if deck_name not in available["decks"]:
+            raise ValueError(f"Anki 牌组不存在：{deck_name}")
+        self.preferences.set_default_deck(deck_name)
+        return {"ok": True, "selected": deck_name, "stale": available["stale"]}
 
     def health(self) -> Dict[str, Any]:
         return {
@@ -603,7 +732,7 @@ class WordflowApp:
             "service": "wordflow-to-anki",
             "openai_configured": bool(self.config.openai_api_key) or self.config.mock_openai,
             "model": self.config.openai_model,
-            "deck": self.config.deck_name,
+            "deck": self.preferences.default_deck(self.config.deck_name),
             "tts": self.config.enable_tts,
             "anki": self.anki.health(),
         }
@@ -613,8 +742,13 @@ class WordflowApp:
         return {"capture": capture, "card": self.generator.generate(capture)}
 
     def capture(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        requested_deck = payload.get("deck") or self.preferences.default_deck(self.config.deck_name)
+        deck_name = normalize_deck_name(requested_deck)
+        # Validate Anki and the destination before spending an OpenAI request.
+        self.anki.ensure_model(deck_name)
         generated = self.generate(payload)
         card = generated["card"]
         audio = self.generator.synthesize(card["word"])
-        result = self.anki.add_card(card, generated["capture"], audio)
+        result = self.anki.add_card(card, generated["capture"], audio, deck_name=deck_name)
+        self.preferences.set_default_deck(deck_name)
         return {"ok": True, "card": card, **result}

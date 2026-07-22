@@ -18,12 +18,17 @@
       <label for="word">单词或短语</label>
       <input id="word" autocomplete="off" placeholder="meticulous" autofocus />
 
+      <label for="deck">保存到 Anki 牌组</label>
+      <select id="deck" disabled>
+        <option>读取牌组…</option>
+      </select>
+
       <label for="context">例句或上下文（可选）</label>
       <textarea id="context" rows="3" placeholder="粘贴看到这个词的原句"></textarea>
 
       <button id="add">生成并加入 Anki</button>
       <p id="result" role="status"></p>
-      <p class="hint">↓ / Tab 移动焦点 · Enter 保存 · Esc 收起</p>
+      <p class="hint">Tab 移动 · ⌘D 牌组 · ⌘↩ 保存 · Esc 返回</p>
     </main>
     <script src="popup.js"></script>
   </body>

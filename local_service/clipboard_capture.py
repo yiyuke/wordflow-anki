@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
+import socket
 import subprocess
 import sys
 import urllib.error
 import urllib.request
+
+
+DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def clipboard_text() -> str:
@@ -34,16 +39,26 @@ def main() -> None:
     request = urllib.request.Request(
         f"{args.service_url.rstrip('/')}/api/capture",
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "X-Wordflow-Client": "wordflow-local",
+        },
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=120) as response:
+        with DIRECT_OPENER.open(request, timeout=120) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
         data = json.loads(error.read().decode("utf-8"))
-    except urllib.error.URLError as error:
-        raise SystemExit(f"无法连接本地服务：{error.reason}") from error
+    except (
+        http.client.RemoteDisconnected,
+        ConnectionResetError,
+        socket.timeout,
+        TimeoutError,
+        urllib.error.URLError,
+    ) as error:
+        reason = error.reason if isinstance(error, urllib.error.URLError) else error
+        raise SystemExit(f"无法连接本地服务：{reason}") from error
 
     if not data.get("ok"):
         raise SystemExit(data.get("error", "加入失败"))

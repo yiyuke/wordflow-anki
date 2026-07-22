@@ -11,12 +11,13 @@ header { margin-bottom: 18px; }
 h1 { margin: 0; font-size: 21px; letter-spacing: -.35px; }
 header p { margin: 4px 0 0; color: #067647; font-size: 13px; font-weight: 700; }
 label { display: block; margin: 13px 0 6px; color: #344054; font-size: 13px; font-weight: 700; }
-input, textarea {
+input, textarea, select {
   box-sizing: border-box; width: 100%; border: 1px solid #d0d5dd; border-radius: 9px;
   padding: 9px 10px; background: white; color: #101828; font: inherit; resize: vertical;
 }
-input:focus, textarea:focus { outline: 2px solid #a6f4c5; border-color: #12b76a; }
+input:focus, textarea:focus, select:focus { outline: 2px solid #a6f4c5; border-color: #12b76a; }
 input::placeholder, textarea::placeholder { color: #98a2b3; opacity: 1; }
+select:disabled { opacity: .65; }
 button {
   width: 100%; margin-top: 14px; border: 0; border-radius: 9px; padding: 10px 12px;
   background: #067647; color: white; font-weight: 700; cursor: pointer;
@@ -32,9 +33,9 @@ button:disabled { opacity: .55; cursor: wait; }
   header p { color: #6ce9a6; }
   label { color: #f2f4f7; }
   #result { color: #d0d5dd; }
-  input, textarea { border-color: #475467; background: #1f2937; color: #f8fafc; }
+  input, textarea, select { border-color: #475467; background: #1f2937; color: #f8fafc; }
   input::placeholder, textarea::placeholder { color: #98a2b3; }
-  input:focus, textarea:focus { outline-color: #32d583; border-color: #32d583; }
+  input:focus, textarea:focus, select:focus { outline-color: #32d583; border-color: #32d583; }
   #result.error { color: #fda29b; }
   .hint { color: #d0d5dd; }
 }

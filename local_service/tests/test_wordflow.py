@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import unittest
 from dataclasses import replace
 from http.client import RemoteDisconnected
@@ -22,8 +23,11 @@ from wordflow import (  # noqa: E402
     extract_response_text,
     html_items,
     identity_tag,
+    keychain_secret,
+    normalize_deck_name,
     normalize_capture,
 )
+from server import is_allowed_origin, is_valid_client_header, signal_quick_add_window  # noqa: E402
 
 
 def contrast_ratio(foreground: str, background: str) -> float:
@@ -57,6 +61,51 @@ def mock_config() -> Config:
 
 
 class WordflowTests(unittest.TestCase):
+    def test_local_service_only_allows_extension_origins(self):
+        self.assertTrue(is_allowed_origin(""))
+        self.assertTrue(is_allowed_origin("chrome-extension://abc123"))
+        self.assertTrue(is_allowed_origin("moz-extension://abc123"))
+        self.assertFalse(is_allowed_origin("https://example.com"))
+        self.assertFalse(is_allowed_origin("null"))
+
+    def test_local_service_requires_client_header(self):
+        self.assertTrue(is_valid_client_header("wordflow-local"))
+        self.assertFalse(is_valid_client_header(""))
+        self.assertFalse(is_valid_client_header("browser"))
+
+    def test_running_quick_window_is_signalled_instead_of_reopened(self):
+        with patch("server.subprocess.run") as process, patch("server.os.kill") as kill:
+            process.return_value.stdout = "/installed/Wordflow Quick Add.app/Contents/MacOS/WordflowQuickAdd\n"
+            with patch("pathlib.Path.read_text", return_value="4242\n"):
+                self.assertTrue(
+                    signal_quick_add_window(
+                        Path("/installed/Wordflow Quick Add.app"),
+                        Path("/tmp/wordflow-test.pid"),
+                    )
+                )
+        self.assertEqual(kill.call_count, 2)
+
+    def test_keychain_lookup_includes_the_current_account(self):
+        result = MagicMock(stdout="secret\n")
+        with (
+            patch("wordflow.sys.platform", "darwin"),
+            patch("wordflow.getpass.getuser", return_value="aurelia"),
+            patch("wordflow.subprocess.run", return_value=result) as run,
+        ):
+            self.assertEqual(keychain_secret("com.wordflow.openai"), "secret")
+        self.assertEqual(
+            run.call_args.args[0],
+            [
+                "security",
+                "find-generic-password",
+                "-a",
+                "aurelia",
+                "-s",
+                "com.wordflow.openai",
+                "-w",
+            ],
+        )
+
     def test_capture_is_cleaned_and_bounded(self):
         capture = normalize_capture({"text": "  meticulous \n", "context": "A   careful sentence."})
         self.assertEqual(capture["text"], "meticulous")
@@ -67,6 +116,11 @@ class WordflowTests(unittest.TestCase):
             normalize_capture({"text": ""})
         with self.assertRaises(ValueError):
             normalize_capture({"text": "x" * 121})
+
+    def test_deck_name_is_validated(self):
+        self.assertEqual(normalize_deck_name("  English   from real life  "), "English from real life")
+        with self.assertRaises(ValueError):
+            normalize_deck_name("")
 
     def test_responses_output_text_is_extracted(self):
         response = {
@@ -96,6 +150,19 @@ class WordflowTests(unittest.TestCase):
         self.assertFalse(first["duplicate"])
         self.assertTrue(second["duplicate"])
         self.assertIn("[…]", first["card"]["context_cloze"])
+
+    def test_selected_deck_is_persisted_and_used_for_capture(self):
+        with tempfile.TemporaryDirectory() as directory:
+            preferences = Path(directory) / "preferences.json"
+            app = WordflowApp(mock_config(), preferences_path=preferences)
+            app.anki.deck_names = lambda: ["English from real life", "Test Deck"]
+            selected = app.select_deck({"deck": "English from real life"})
+            result = app.capture({"text": "lucid", "deck": selected["selected"]})
+
+            restored = WordflowApp(mock_config(), preferences_path=preferences)
+            restored.anki.deck_names = lambda: ["English from real life", "Test Deck"]
+            self.assertEqual(restored.decks()["selected"], "English from real life")
+            self.assertEqual(result["deck"], "English from real life")
 
     def test_anki_model_check_is_cached(self):
         client = AnkiClient(replace(mock_config(), mock_anki=False))

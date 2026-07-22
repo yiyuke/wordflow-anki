@@ -20,6 +20,8 @@ AnkiConnect → Anki 桌面版
 - 自动携带网页标题、URL 和附近上下文
 - 手动输入窗口，适合不能选中的链接、Word、PDF、Codex 等场景
 - 原生快速输入窗支持置顶、系统红黄绿按钮和全键盘操作
+- 快速窗口可读取现有 Anki 牌组、记住默认牌组，并用 `Command + D` 切换
+- 快捷键会可靠地重新聚焦已置顶窗口；保存或取消后可回到原来的 App
 - 窗口保持紧凑，并记住用户调整后的尺寸
 - 自动生成中文释义、IPA、英文定义、搭配、可靠词源、记忆提示和例句
 - 自动创建 `Vocabulary Inbox` 牌组和 `AI Vocabulary` Note Type
@@ -108,11 +110,14 @@ Edge 的步骤相同，入口是 `edge://extensions`。
 ### 快速输入窗的键盘操作
 
 - 打开窗口时，光标自动落在“单词或短语”。
+- 即使置顶窗口已经显示，再按 `Option + Shift + W` 也会重新聚焦单词框。
 - 在单词框按 `↓` 或 `Tab`：进入上下文。
 - 在上下文按 `Tab`：进入“加入 Anki”按钮；按 `Shift + Tab` 返回单词框。
-- 在单词框按 `Enter`，或在任意位置按 `Command + Enter`：生成并保存。
+- `Command + D`：打开牌组选择器；选择会成为浏览器右键添加和下次输入的默认牌组。
+- 在单词框按 `Enter`，或点击按钮：生成并保存，窗口保持打开，适合连续输入。
+- 在任意位置按 `Command + Enter`：生成并保存，成功后收起窗口并返回原来的 App。
 - `Command + P`：切换“置顶”。窗口会记住这个选择。
-- `Esc`：无论光标停在哪个输入框，都会收起窗口。
+- `Esc`：无论光标停在哪个输入框，都会收起窗口并返回原来的 App。
 
 原生窗口保留 macOS 的关闭、最小化和缩放按钮。默认尺寸只包裹录词所需内容，也允许在合理范围内调整并记住尺寸。
 
@@ -135,6 +140,14 @@ Edge 的步骤相同，入口是 `edge://extensions`。
 ```text
 ~/Library/Application Support/Wordflow/.env
 ```
+
+窗口中选择的默认牌组与最近读取的牌组列表保存在：
+
+```text
+~/Library/Application Support/Wordflow/preferences.json
+```
+
+不需要手动编辑这个文件；`ANKI_DECK` 仍作为第一次运行和无法读取 Anki 时的后备牌组。
 
 默认使用 OpenAI `gpt-5.6-luna`，适合高频、成本敏感的结构化制卡。可以修改 `OPENAI_MODEL`。项目使用 Responses API 且设置 `store: false`。
 
@@ -192,6 +205,7 @@ GitHub 仓库和商店不是二选一：
 
 - `.env` 已被 Git 忽略，API Key 默认保存在 macOS 钥匙串。
 - 本地服务仅监听 `127.0.0.1:8766`；AnkiConnect 默认监听 `127.0.0.1:8765`。
+- 写入接口拒绝普通网页来源，并要求 Wordflow 客户端标识；网页不能直接借用本地服务生成或写入卡片。
 - 浏览器捕获会向 OpenAI API 发送：选中文字、最多一小段附近上下文和页面标题；不会上传整个网页或整个文档。
 - 页面内容在提示词中被视为数据，不会被当成模型指令执行。
 - 页面 URL 会写入本地 Anki 卡片作为来源，但不会放进 OpenAI 请求。
@@ -216,6 +230,7 @@ cp .env.example .env
 MOCK_OPENAI=1 MOCK_ANKI=1 ./start-service.command
 curl -X POST http://127.0.0.1:8766/api/capture \
   -H 'Content-Type: application/json' \
+  -H 'X-Wordflow-Client: wordflow-local' \
   -d '{"text":"meticulous","context":"She is meticulous about every detail."}'
 ```
 

@@ -39,7 +39,10 @@ async function capture(payload, tabId) {
   try {
     const response = await fetch(`${serviceUrl.replace(/\/$/, "")}/api/capture`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Wordflow-Client": "wordflow-local"
+      },
       body: JSON.stringify(payload)
     });
     const data = await response.json();
@@ -64,6 +67,11 @@ async function openManualInput() {
   try {
     const response = await fetch(`${serviceUrl.replace(/\/$/, "")}/api/window/open`, {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Wordflow-Client": "wordflow-local"
+      },
+      body: "{}",
       signal: controller.signal
     });
     const data = await response.json();
@@ -78,7 +86,7 @@ async function openManualInput() {
     url: chrome.runtime.getURL("popup.html"),
     type: "popup",
     width: 460,
-    height: 410,
+    height: 455,
     focused: true
   });
 }

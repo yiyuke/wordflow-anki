@@ -1,5 +1,6 @@
 .DS_Store
 .env
+preferences.json
 __pycache__/
 *.py[cod]
 *.log

@@ -1,8 +1,10 @@
 import AppKit
+import Darwin
 import Foundation
 
 private final class QuickAddWindow: NSWindow {
     var submitHandler: (() -> Void)?
+    var deckHandler: (() -> Void)?
     var pinHandler: (() -> Void)?
     var closeHandler: (() -> Void)?
 
@@ -15,6 +17,10 @@ private final class QuickAddWindow: NSWindow {
         }
         if modifiers.contains(.command), key == "p" {
             pinHandler?()
+            return
+        }
+        if modifiers.contains(.command), key == "d" {
+            deckHandler?()
             return
         }
         if modifiers.contains(.command), event.keyCode == 36 || event.keyCode == 76 {
@@ -57,17 +63,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var window: QuickAddWindow!
     private var wordField: NSTextField!
     private var contextView: ContextTextView!
+    private var deckButton: NSPopUpButton!
     private var addButton: NSButton!
     private var pinButton: NSButton!
     private var statusLabel: NSTextField!
     private var progress: NSProgressIndicator!
     private var keyMonitor: Any?
+    private var showSignalSource: DispatchSourceSignal?
+    private var previousApplication: NSRunningApplication?
+    private var isLoadingDecks = false
     private var isSubmitting = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         buildWindow()
         installKeyboardMonitor()
+        installShowSignalHandler()
         showWindow()
     }
 
@@ -75,6 +86,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)
         }
+        showSignalSource?.cancel()
+        removePIDFile()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -100,7 +113,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.setFrameAutosaveName("WordflowQuickAddWindowV2")
-        window.submitHandler = { [weak self] in self?.submit() }
+        window.submitHandler = { [weak self] in self?.submit(returnAfterSave: true) }
+        window.deckHandler = { [weak self] in self?.showDeckMenu() }
         window.pinHandler = { [weak self] in self?.togglePin() }
         window.closeHandler = { [weak self] in self?.hideWindow() }
 
@@ -129,6 +143,28 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         header.spacing = 12
 
         let wordLabel = label("单词或短语", size: 13, weight: .semibold, color: .labelColor)
+        let wordHeaderSpacer = NSView()
+        wordHeaderSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let deckLabel = label("保存到", size: 12, weight: .medium, color: .secondaryLabelColor)
+        deckButton = NSPopUpButton(frame: .zero, pullsDown: false)
+        deckButton.controlSize = .small
+        deckButton.font = .systemFont(ofSize: 12, weight: .medium)
+        deckButton.target = self
+        deckButton.action = #selector(deckChanged)
+        deckButton.addItem(withTitle: "读取牌组…")
+        deckButton.isEnabled = false
+        deckButton.setAccessibilityIdentifier("deckButton")
+        deckButton.setAccessibilityLabel("保存到 Anki 牌组")
+        deckButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 138).isActive = true
+        deckButton.widthAnchor.constraint(lessThanOrEqualToConstant: 210).isActive = true
+        let deckControl = NSStackView(views: [deckLabel, deckButton])
+        deckControl.orientation = .horizontal
+        deckControl.alignment = .centerY
+        deckControl.spacing = 6
+        let wordHeader = NSStackView(views: [wordLabel, wordHeaderSpacer, deckControl])
+        wordHeader.orientation = .horizontal
+        wordHeader.alignment = .centerY
+        wordHeader.spacing = 10
         wordField = NSTextField()
         wordField.placeholderString = "例如：serendipity"
         wordField.font = .systemFont(ofSize: 16)
@@ -147,7 +183,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         contextView.setAccessibilityIdentifier("contextField")
         contextView.focusWordHandler = { [weak self] in self?.focusWord() }
         contextView.focusNextHandler = { [weak self] in self?.focusAddButton() }
-        contextView.submitHandler = { [weak self] in self?.submit() }
+        contextView.submitHandler = { [weak self] in self?.submit(returnAfterSave: true) }
 
         let contextScroll = NSScrollView()
         contextScroll.borderType = .bezelBorder
@@ -175,7 +211,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         statusRow.detachesHiddenViews = true
         statusRow.heightAnchor.constraint(equalToConstant: 18).isActive = true
 
-        let hint = label("↓ / Tab 移动焦点  ·  ⌘↩ 保存  ·  Esc 收起", size: 12, weight: .medium, color: .secondaryLabelColor)
+        let hint = label("Tab 移动 · ⌘D 牌组 · ⌘↩ 保存返回 · Esc 返回", size: 12, weight: .medium, color: .secondaryLabelColor)
         addButton = NSButton(title: "加入 Anki", target: self, action: #selector(addClicked))
         addButton.bezelStyle = .rounded
         addButton.controlSize = .large
@@ -192,13 +228,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         footer.alignment = .centerY
         footer.spacing = 12
 
-        let stack = NSStackView(views: [header, wordLabel, wordField, contextLabel, contextScroll, statusRow, footer])
+        let stack = NSStackView(views: [header, wordHeader, wordField, contextLabel, contextScroll, statusRow, footer])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
         stack.setCustomSpacing(18, after: header)
-        stack.setCustomSpacing(5, after: wordLabel)
+        stack.setCustomSpacing(5, after: wordHeader)
         stack.setCustomSpacing(12, after: wordField)
         stack.setCustomSpacing(5, after: contextLabel)
         stack.setCustomSpacing(9, after: contextScroll)
@@ -210,6 +246,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
             stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18),
             header.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            wordHeader.widthAnchor.constraint(equalTo: stack.widthAnchor),
             wordField.widthAnchor.constraint(equalTo: stack.widthAnchor),
             wordField.heightAnchor.constraint(equalToConstant: 36),
             contextScroll.widthAnchor.constraint(equalTo: stack.widthAnchor),
@@ -239,12 +276,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 self.togglePin()
                 return nil
             }
+            if modifiers.contains(.command), key == "d" {
+                self.showDeckMenu()
+                return nil
+            }
             if modifiers.contains(.command), key == "q" {
                 NSApp.terminate(nil)
                 return nil
             }
             if modifiers.contains(.command), event.keyCode == 36 || event.keyCode == 76 {
-                self.submit()
+                self.submit(returnAfterSave: true)
                 return nil
             }
             return event
@@ -258,14 +299,69 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         return field
     }
 
+    private func installShowSignalHandler() {
+        Darwin.signal(SIGUSR1, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
+        source.setEventHandler { [weak self] in
+            self?.showWindow()
+        }
+        source.resume()
+        showSignalSource = source
+        writePIDFile()
+    }
+
+    private func pidFileURL() -> URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("Wordflow", isDirectory: true)
+            .appendingPathComponent("quick-add.pid")
+    }
+
+    private func writePIDFile() {
+        guard let url = pidFileURL() else { return }
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try "\(ProcessInfo.processInfo.processIdentifier)\n".write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            // The launch path remains usable even if the optional activation PID cannot be saved.
+        }
+    }
+
+    private func removePIDFile() {
+        guard let url = pidFileURL(),
+              let stored = try? String(contentsOf: url, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+              stored == "\(ProcessInfo.processInfo.processIdentifier)" else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    private func rememberPreviousApplication() {
+        guard let frontmost = NSWorkspace.shared.frontmostApplication,
+              frontmost.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+        previousApplication = frontmost
+    }
+
     private func showWindow() {
+        rememberPreviousApplication()
+        if !isSubmitting {
+            statusLabel.stringValue = ""
+        }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         focusWord()
+        loadDecks()
     }
 
     private func hideWindow() {
         window.orderOut(nil)
+        if let previousApplication, !previousApplication.isTerminated {
+            if #available(macOS 14.0, *) {
+                previousApplication.activate(options: [.activateAllWindows])
+            } else {
+                previousApplication.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            }
+        }
     }
 
     private func focusWord() {
@@ -280,6 +376,95 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         window.makeFirstResponder(addButton)
     }
 
+    private func showDeckMenu() {
+        guard deckButton.isEnabled else {
+            NSSound.beep()
+            return
+        }
+        window.makeFirstResponder(deckButton)
+        deckButton.performClick(nil)
+    }
+
+    private func selectedDeck() -> String {
+        deckButton.selectedItem?.title ?? "Vocabulary Inbox"
+    }
+
+    private func serviceRequest(path: String, method: String = "GET", payload: [String: Any]? = nil) -> URLRequest? {
+        guard let url = URL(string: "http://127.0.0.1:8766\(path)") else { return nil }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("wordflow-local", forHTTPHeaderField: "X-Wordflow-Client")
+        if let payload {
+            request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        }
+        request.timeoutInterval = 15
+        return request
+    }
+
+    private func loadDecks() {
+        guard !isLoadingDecks, let request = serviceRequest(path: "/api/decks") else { return }
+        isLoadingDecks = true
+        Task {
+            defer { isLoadingDecks = false }
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                let http = response as? HTTPURLResponse
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                guard http?.statusCode == 200,
+                      json?["ok"] as? Bool == true,
+                      let decks = json?["decks"] as? [String],
+                      !decks.isEmpty else {
+                    throw NSError(
+                        domain: "Wordflow",
+                        code: http?.statusCode ?? -1,
+                        userInfo: [NSLocalizedDescriptionKey: json?["error"] as? String ?? "无法读取牌组"]
+                    )
+                }
+                let selected = json?["selected"] as? String ?? decks[0]
+                deckButton.removeAllItems()
+                deckButton.addItems(withTitles: decks)
+                deckButton.selectItem(withTitle: selected)
+                deckButton.isEnabled = true
+            } catch {
+                if deckButton.numberOfItems == 0 || deckButton.itemTitles == ["读取牌组…"] {
+                    deckButton.removeAllItems()
+                    deckButton.addItem(withTitle: "Vocabulary Inbox")
+                }
+                deckButton.isEnabled = false
+                statusLabel.textColor = .systemRed
+                statusLabel.stringValue = error.localizedDescription
+            }
+        }
+    }
+
+    @objc private func deckChanged() {
+        let deck = selectedDeck()
+        focusWord()
+        guard let request = serviceRequest(
+            path: "/api/decks/select",
+            method: "POST",
+            payload: ["deck": deck]
+        ) else { return }
+        Task {
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                let http = response as? HTTPURLResponse
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                guard http?.statusCode == 200, json?["ok"] as? Bool == true else {
+                    throw NSError(
+                        domain: "Wordflow",
+                        code: http?.statusCode ?? -1,
+                        userInfo: [NSLocalizedDescriptionKey: json?["error"] as? String ?? "牌组选择未保存"]
+                    )
+                }
+            } catch {
+                statusLabel.textColor = .systemRed
+                statusLabel.stringValue = error.localizedDescription
+            }
+        }
+    }
+
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         guard control === wordField else { return false }
         if commandSelector == #selector(NSResponder.moveDown(_:)) || commandSelector == #selector(NSResponder.insertTab(_:)) {
@@ -287,14 +472,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             return true
         }
         if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-            submit()
+            submit(returnAfterSave: false)
             return true
         }
         return false
     }
 
     @objc private func addClicked() {
-        submit()
+        submit(returnAfterSave: false)
     }
 
     @objc private func pinClicked() {
@@ -312,7 +497,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         defaults.set(pinned, forKey: "windowPinned")
     }
 
-    private func submit() {
+    private func submit(returnAfterSave: Bool) {
         guard !isSubmitting else { return }
         let word = wordField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !word.isEmpty else {
@@ -333,6 +518,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         let payload: [String: Any] = [
             "text": word,
             "context": contextView.string.trimmingCharacters(in: .whitespacesAndNewlines),
+            "deck": selectedDeck(),
             "source_title": "Wordflow 快速添加",
             "source_url": "",
             "source_type": "native-manual"
@@ -342,6 +528,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("wordflow-local", forHTTPHeaderField: "X-Wordflow-Client")
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         request.timeoutInterval = 120
 
@@ -360,12 +547,24 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 let duplicate = json?["duplicate"] as? Bool ?? false
                 let card = json?["card"] as? [String: Any]
                 let savedWord = card?["word"] as? String ?? word
-                finishSubmission(message: duplicate ? "“\(savedWord)” 已经在 Anki 里" : "已加入：\(savedWord)", success: true)
+                let savedDeck = json?["deck"] as? String ?? selectedDeck()
+                finishSubmission(
+                    message: duplicate
+                        ? "“\(savedWord)” 已存在于 \(savedDeck)"
+                        : "已加入 \(savedDeck)：\(savedWord)",
+                    success: true
+                )
                 if !duplicate {
                     wordField.stringValue = ""
                     contextView.string = ""
                 }
-                focusWord()
+                if returnAfterSave {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+                        self?.hideWindow()
+                    }
+                } else {
+                    focusWord()
+                }
             } catch {
                 finishSubmission(message: error.localizedDescription, success: false)
             }
