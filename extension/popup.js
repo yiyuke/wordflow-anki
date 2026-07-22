@@ -1,5 +1,18 @@
 const DEFAULT_SERVICE_URL = "http://127.0.0.1:8766";
 const $ = (selector) => document.querySelector(selector);
+let resultClearTimer;
+
+function setResult(message, { error = false, clearAfter = 0 } = {}) {
+  clearTimeout(resultClearTimer);
+  const result = $("#result");
+  result.className = error ? "error" : "";
+  result.textContent = message;
+  if (clearAfter > 0 && message) {
+    resultClearTimer = setTimeout(() => {
+      if (result.textContent === message) result.textContent = "";
+    }, clearAfter);
+  }
+}
 
 function friendlyMessage(error) {
   const message = String(error?.message || error || "操作失败").trim();
@@ -24,9 +37,7 @@ async function checkHealth() {
     const data = await response.json();
     if (!data.anki?.ok) throw new Error(data.anki?.error || "Anki 未连接");
   } catch (_error) {
-    const result = $("#result");
-    result.className = "error";
-    result.textContent = friendlyMessage(_error);
+    setResult(friendlyMessage(_error), { error: true, clearAfter: 10000 });
   }
 }
 
@@ -64,9 +75,7 @@ async function loadDecks() {
     deck.value = data.selected;
     deck.disabled = false;
   } catch (error) {
-    const result = $("#result");
-    result.className = "error";
-    result.textContent = friendlyMessage(error);
+    setResult(friendlyMessage(error), { error: true, clearAfter: 10000 });
   }
 }
 
@@ -82,12 +91,13 @@ async function saveDeck() {
 
 async function addWord(returnAfterSave = false) {
   const word = $("#word").value.trim();
-  if (!word) return;
+  if (!word) {
+    setResult("请先输入一个单词或短语", { error: true, clearAfter: 10000 });
+    return;
+  }
   const button = $("#add");
-  const result = $("#result");
   button.disabled = true;
-  result.className = "";
-  result.textContent = "正在生成词卡…";
+  setResult("正在生成词卡…");
   try {
     const response = await fetch(`${await getServiceUrl()}/api/capture`, {
       method: "POST",
@@ -103,17 +113,17 @@ async function addWord(returnAfterSave = false) {
     });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
-    result.textContent = data.duplicate
+    const message = data.duplicate
       ? `“${data.card.word}” 已存在于 ${data.deck}`
       : `已加入 ${data.deck}：${data.card.word}`;
+    setResult(message, { clearAfter: 6000 });
     if (!data.duplicate) {
       $("#word").value = "";
       $("#context").value = "";
     }
     if (returnAfterSave) await returnToPreviousBrowserWindow();
   } catch (error) {
-    result.className = "error";
-    result.textContent = friendlyMessage(error);
+    setResult(friendlyMessage(error), { error: true, clearAfter: 10000 });
   } finally {
     button.disabled = false;
   }
@@ -127,9 +137,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 $("#add").addEventListener("click", addWord);
 $("#deck").addEventListener("change", () => {
   saveDeck().catch((error) => {
-    const result = $("#result");
-    result.className = "error";
-    result.textContent = friendlyMessage(error);
+    setResult(friendlyMessage(error), { error: true, clearAfter: 10000 });
   });
 });
 $("#word").addEventListener("keydown", (event) => {

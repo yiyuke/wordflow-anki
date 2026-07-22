@@ -81,6 +81,7 @@ private final class ContextTextView: NSTextView {
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTextFieldDelegate {
     private let defaults = UserDefaults.standard
+    private let defaultContentSize = NSSize(width: 468, height: 379)
     private var window: QuickAddWindow!
     private var wordField: NSTextField!
     private var contextView: ContextTextView!
@@ -94,6 +95,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var previousApplication: NSRunningApplication?
     private var availableDecks: [String] = []
     private var activeDeck = "Vocabulary Inbox"
+    private var statusGeneration = 0
     private var isLoadingDecks = false
     private var isSubmitting = false
 
@@ -125,13 +127,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func buildWindow() {
         window = QuickAddWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 394),
+            contentRect: NSRect(origin: .zero, size: defaultContentSize),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Wordflow Quick Add"
-        window.minSize = NSSize(width: 468, height: 374)
+        window.minSize = window.frameRect(
+            forContentRect: NSRect(origin: .zero, size: defaultContentSize)
+        ).size
         window.maxSize = NSSize(width: 660, height: 540)
         window.isReleasedWhenClosed = false
         window.delegate = self
@@ -367,6 +371,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         return String(message.prefix(41)) + "…"
     }
 
+    private func showStatus(
+        _ message: String,
+        color: NSColor = .secondaryLabelColor,
+        clearAfter delay: TimeInterval? = nil
+    ) {
+        statusGeneration += 1
+        let generation = statusGeneration
+        statusLabel.textColor = color
+        statusLabel.stringValue = message
+        guard let delay, !message.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, self.statusGeneration == generation else { return }
+            self.statusLabel.stringValue = ""
+        }
+    }
+
     private func installShowSignalHandler() {
         Darwin.signal(SIGUSR1, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
@@ -412,13 +432,31 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func showWindow() {
         rememberPreviousApplication()
+        if !window.isVisible {
+            restoreDefaultWindowSize()
+        }
         if !isSubmitting {
-            statusLabel.stringValue = ""
+            showStatus("")
         }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         focusWord()
         loadDecks()
+    }
+
+    private func restoreDefaultWindowSize() {
+        let desiredSize = window.frameRect(
+            forContentRect: NSRect(origin: .zero, size: defaultContentSize)
+        ).size
+        var frame = window.frame
+        let top = frame.maxY
+        frame.size = desiredSize
+        frame.origin.y = top - desiredSize.height
+        if let visibleFrame = (window.screen ?? NSScreen.main)?.visibleFrame {
+            frame.origin.x = min(max(frame.origin.x, visibleFrame.minX), visibleFrame.maxX - frame.width)
+            frame.origin.y = min(max(frame.origin.y, visibleFrame.minY), visibleFrame.maxY - frame.height)
+        }
+        window.setFrame(frame, display: false)
     }
 
     private func hideWindow() {
@@ -520,8 +558,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             } catch {
                 let fallback = availableDecks.isEmpty ? [activeDeck] : availableDecks
                 configureDeckButton(decks: fallback, selected: activeDeck, enabled: false)
-                statusLabel.textColor = .systemRed
-                statusLabel.stringValue = shortMessage(for: error)
+                showStatus(shortMessage(for: error), color: .systemRed, clearAfter: 10)
             }
         }
     }
@@ -548,8 +585,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                     )
                 }
             } catch {
-                statusLabel.textColor = .systemRed
-                statusLabel.stringValue = shortMessage(for: error)
+                showStatus(shortMessage(for: error), color: .systemRed, clearAfter: 10)
             }
         }
     }
@@ -592,8 +628,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         guard !isSubmitting else { return }
         let word = wordField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !word.isEmpty else {
-            statusLabel.textColor = .systemRed
-            statusLabel.stringValue = "请先输入一个单词或短语"
+            showStatus("请先输入一个单词或短语", color: .systemRed, clearAfter: 10)
             NSSound.beep()
             focusWord()
             return
@@ -603,8 +638,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         setControlsEnabled(false)
         progress.isHidden = false
         progress.startAnimation(nil)
-        statusLabel.textColor = .secondaryLabelColor
-        statusLabel.stringValue = "正在生成词卡…"
+        showStatus("正在生成词卡…")
 
         let payload: [String: Any] = [
             "text": word,
@@ -667,8 +701,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         progress.stopAnimation(nil)
         progress.isHidden = true
         setControlsEnabled(true)
-        statusLabel.textColor = success ? .systemGreen : .systemRed
-        statusLabel.stringValue = message
+        showStatus(
+            message,
+            color: success ? .systemGreen : .systemRed,
+            clearAfter: success ? 6 : 10
+        )
     }
 
     private func setControlsEnabled(_ enabled: Bool) {
