@@ -2,6 +2,24 @@ const DEFAULT_SERVICE_URL = "http://127.0.0.1:8766";
 const $ = (selector) => document.querySelector(selector);
 let resultClearTimer;
 
+function t(key, substitutions, fallback = key) {
+  return chrome.i18n.getMessage(key, substitutions) || fallback;
+}
+
+function languageCode() {
+  return chrome.i18n.getUILanguage().toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+function localizePage() {
+  document.documentElement.lang = languageCode() === "zh" ? "zh-CN" : "en";
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    element.textContent = t(element.dataset.i18n, undefined, element.textContent);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+    element.placeholder = t(element.dataset.i18nPlaceholder, undefined, element.placeholder);
+  });
+}
+
 function setResult(message, { error = false, clearAfter = 0 } = {}) {
   clearTimeout(resultClearTimer);
   const result = $("#result");
@@ -15,15 +33,20 @@ function setResult(message, { error = false, clearAfter = 0 } = {}) {
 }
 
 function friendlyMessage(error) {
-  const message = String(error?.message || error || "操作失败").trim();
-  if (message.includes("Anki 启动失败")) return "Anki 启动失败，请手动打开";
-  if (message.includes("AnkiConnect") || message.includes("Anki 未连接") || message.includes("连接中断")) {
-    return "Anki 未连接，请稍后重试";
+  const message = String(error?.message || error || t("errorGeneric", undefined, "Something went wrong")).trim();
+  if (/Anki 启动失败|could not open Anki/i.test(message)) {
+    return t("ankiLaunchFailed", undefined, "Could not open Anki");
   }
-  if (/OPENAI_API_KEY|API Key/i.test(message)) return "请先配置 OpenAI API Key";
-  if (/OpenAI|网络连接失败/i.test(message)) return "网络连接失败，请稍后重试";
-  if (/Failed to fetch|could not connect|本地服务/i.test(message)) return "Wordflow 服务未连接";
-  return message.length > 42 ? `${message.slice(0, 41)}…` : message;
+  if (/AnkiConnect|Anki 未连接|连接中断|Anki is not connected/i.test(message)) {
+    return t("ankiDisconnected", undefined, "Anki is not connected");
+  }
+  if (/OPENAI_API_KEY|API Key/i.test(message)) return t("apiKeyMissing", undefined, "Set up your OpenAI API key first");
+  if (/OpenAI|网络连接失败|network error/i.test(message)) return t("networkFailed", undefined, "Network error — try again");
+  if (/Failed to fetch|could not connect|本地服务|local service/i.test(message)) {
+    return t("serviceDisconnected", undefined, "Wordflow service is not connected");
+  }
+  const limit = languageCode() === "zh" ? 42 : 58;
+  return message.length > limit ? `${message.slice(0, limit - 1)}…` : message;
 }
 
 async function getServiceUrl() {
@@ -35,7 +58,7 @@ async function checkHealth() {
   try {
     const response = await fetch(`${await getServiceUrl()}/health`);
     const data = await response.json();
-    if (!data.anki?.ok) throw new Error(data.anki?.error || "Anki 未连接");
+    if (!data.anki?.ok) throw new Error(data.anki?.error || t("ankiDisconnected", undefined, "Anki is not connected"));
   } catch (_error) {
     setResult(friendlyMessage(_error), { error: true, clearAfter: 10000 });
   }
@@ -69,7 +92,7 @@ async function loadDecks() {
     });
     const data = await response.json();
     if (!response.ok || !data.ok || !Array.isArray(data.decks) || !data.decks.length) {
-      throw new Error(data.error || "无法读取牌组");
+      throw new Error(data.error || t("decksLoadFailed", undefined, "Could not load Anki decks"));
     }
     deck.replaceChildren(...data.decks.map((name) => new Option(name, name)));
     deck.value = data.selected;
@@ -86,18 +109,18 @@ async function saveDeck() {
     body: JSON.stringify({ deck: $("#deck").value })
   });
   const data = await response.json();
-  if (!response.ok || !data.ok) throw new Error(data.error || "牌组选择未保存");
+  if (!response.ok || !data.ok) throw new Error(data.error || t("deckSaveFailed", undefined, "Could not save the deck choice"));
 }
 
 async function addWord(returnAfterSave = false) {
   const word = $("#word").value.trim();
   if (!word) {
-    setResult("请先输入一个单词或短语", { error: true, clearAfter: 10000 });
+    setResult(t("wordRequired", undefined, "Enter a word or phrase first"), { error: true, clearAfter: 10000 });
     return;
   }
   const button = $("#add");
   button.disabled = true;
-  setResult("正在生成词卡…");
+  setResult(t("generating", undefined, "Creating your card…"));
   try {
     const response = await fetch(`${await getServiceUrl()}/api/capture`, {
       method: "POST",
@@ -106,7 +129,8 @@ async function addWord(returnAfterSave = false) {
         text: word,
         context: $("#context").value.trim(),
         deck: $("#deck").value,
-        source_title: "Arc 扩展手动输入",
+        language: languageCode(),
+        source_title: t("sourceManual", undefined, "Wordflow manual input"),
         source_url: "",
         source_type: "browser-manual"
       })
@@ -114,8 +138,8 @@ async function addWord(returnAfterSave = false) {
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
     const message = data.duplicate
-      ? `“${data.card.word}” 已存在于 ${data.deck}`
-      : `已加入 ${data.deck}：${data.card.word}`;
+      ? t("duplicateInDeck", [data.card.word, data.deck], `“${data.card.word}” already exists in ${data.deck}`)
+      : t("addedToDeck", [data.deck, data.card.word], `Added to ${data.deck}: ${data.card.word}`);
     setResult(message, { clearAfter: 6000 });
     if (!data.duplicate) {
       $("#word").value = "";
@@ -130,6 +154,7 @@ async function addWord(returnAfterSave = false) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  localizePage();
   $("#word").focus();
   checkHealth();
   loadDecks();

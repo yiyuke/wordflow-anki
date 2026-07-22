@@ -1,27 +1,43 @@
 const MENU_ID = "wordflow-add-to-anki";
 const DEFAULT_SERVICE_URL = "http://127.0.0.1:8766";
 
-function friendlyMessage(error) {
-  const message = String(error?.message || error || "操作失败").trim();
-  if (message.includes("Anki 启动失败")) return "Anki 启动失败，请手动打开";
-  if (message.includes("AnkiConnect") || message.includes("Anki 未连接") || message.includes("连接中断")) {
-    return "Anki 未连接，请稍后重试";
-  }
-  if (/OPENAI_API_KEY|API Key/i.test(message)) return "请先配置 OpenAI API Key";
-  if (/OpenAI|网络连接失败/i.test(message)) return "网络连接失败，请稍后重试";
-  if (/Failed to fetch|could not connect|本地服务/i.test(message)) return "Wordflow 服务未连接";
-  return message.length > 42 ? `${message.slice(0, 41)}…` : message;
+function t(key, substitutions, fallback = key) {
+  return chrome.i18n.getMessage(key, substitutions) || fallback;
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+function languageCode() {
+  return chrome.i18n.getUILanguage().toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+function friendlyMessage(error) {
+  const message = String(error?.message || error || t("errorGeneric", undefined, "Something went wrong")).trim();
+  if (/Anki 启动失败|could not open Anki/i.test(message)) {
+    return t("ankiLaunchFailed", undefined, "Could not open Anki");
+  }
+  if (/AnkiConnect|Anki 未连接|连接中断|Anki is not connected/i.test(message)) {
+    return t("ankiDisconnected", undefined, "Anki is not connected");
+  }
+  if (/OPENAI_API_KEY|API Key/i.test(message)) return t("apiKeyMissing", undefined, "Set up your OpenAI API key first");
+  if (/OpenAI|网络连接失败|network error/i.test(message)) return t("networkFailed", undefined, "Network error — try again");
+  if (/Failed to fetch|could not connect|本地服务|local service/i.test(message)) {
+    return t("serviceDisconnected", undefined, "Wordflow service is not connected");
+  }
+  const limit = languageCode() === "zh" ? 42 : 58;
+  return message.length > limit ? `${message.slice(0, limit - 1)}…` : message;
+}
+
+function installContextMenu() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU_ID,
-      title: "加入 Anki：%s",
+      title: t("contextMenuTitle", undefined, "Add to Anki: %s"),
       contexts: ["selection"]
     });
   });
-});
+}
+
+chrome.runtime.onInstalled.addListener(installContextMenu);
+chrome.runtime.onStartup.addListener(installContextMenu);
 
 async function settings() {
   return chrome.storage.sync.get({ serviceUrl: DEFAULT_SERVICE_URL });
@@ -61,9 +77,13 @@ async function capture(payload, tabId) {
     if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
 
     if (data.duplicate) {
-      await showResult(tabId, `“${data.card.word}” 已经在 Anki 里`, "duplicate");
+      await showResult(
+        tabId,
+        t("duplicateInAnki", [data.card.word], `“${data.card.word}” is already in Anki`),
+        "duplicate"
+      );
     } else {
-      await showResult(tabId, `已加入 Anki：${data.card.word}`, "success");
+      await showResult(tabId, t("addedToAnki", [data.card.word], `Added to Anki: ${data.card.word}`), "success");
     }
     return data;
   } catch (error) {
@@ -121,6 +141,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   await capture({
     text: selected || pageContext.text,
     context: pageContext.context,
+    language: languageCode(),
     source_title: tab?.title || "",
     source_url: info.pageUrl || tab?.url || "",
     source_type: "browser"
@@ -136,12 +157,13 @@ chrome.commands.onCommand.addListener(async (command) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const selected = await getContext(tab?.id);
   if (!selected.text) {
-    await showResult(tab?.id, "请先选中一个单词或短语", "error");
+    await showResult(tab?.id, t("selectionRequired", undefined, "Select a word or phrase first"), "error");
     return;
   }
   await capture({
     text: selected.text,
     context: selected.context,
+    language: languageCode(),
     source_title: tab?.title || "",
     source_url: tab?.url || "",
     source_type: "browser"

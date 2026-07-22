@@ -110,6 +110,13 @@ class WordflowTests(unittest.TestCase):
         capture = normalize_capture({"text": "  meticulous \n", "context": "A   careful sentence."})
         self.assertEqual(capture["text"], "meticulous")
         self.assertEqual(capture["context"], "A careful sentence.")
+        self.assertEqual(capture["language"], "zh")
+
+    def test_capture_accepts_english_explanations(self):
+        capture = normalize_capture({"text": "lucid", "language": "en"})
+        self.assertEqual(capture["language"], "en")
+        fallback = normalize_capture({"text": "lucid", "language": "unsupported"})
+        self.assertEqual(fallback["language"], "zh")
 
     def test_empty_and_long_selection_are_rejected(self):
         with self.assertRaises(ValueError):
@@ -178,7 +185,7 @@ class WordflowTests(unittest.TestCase):
         self.assertEqual(calls, ["deckNames", "modelNames"])
 
     def test_generation_uses_latency_reasoning_setting(self):
-        capture = normalize_capture({"text": "lucid", "context": "A lucid explanation."})
+        capture = normalize_capture({"text": "lucid", "context": "A lucid explanation.", "language": "en"})
         card = {
             "word": "lucid",
             "lemma": "lucid",
@@ -208,6 +215,9 @@ class WordflowTests(unittest.TestCase):
         payload = request_json.call_args.args[1]
         self.assertEqual(payload["reasoning"], {"effort": "none"})
         self.assertEqual(payload["max_output_tokens"], 1400)
+        self.assertIn("explanation language is English", payload["input"][0]["content"])
+        user_input = json.loads(payload["input"][1]["content"])
+        self.assertEqual(user_input["explanation_language"], "en")
 
     def test_remote_disconnect_is_retried_and_names_the_service(self):
         with (

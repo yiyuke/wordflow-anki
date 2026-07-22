@@ -1,223 +1,143 @@
-# Wordflow to Anki
+<p align="center">
+  <img src="assets/wordflow-logo.png" alt="Wordflow logo" width="132">
+</p>
 
-选中网页里的英文单词或短语，自动生成包含中文释义、IPA、英文定义、搭配、词源、记忆提示和例句的双向 Anki 卡片。
+<h1 align="center">Wordflow</h1>
 
-Wordflow 当前不是一个独立桌面 App，而是一套本地工具：
+<p align="center"><strong>Turn every new word into a review.</strong></p>
+<p align="center">遇见生词，立刻变成记忆。</p>
+
+<p align="center">
+  <a href="#english">English</a> · <a href="#简体中文">简体中文</a>
+</p>
+
+<p align="center">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-12%2B-111827?logo=apple">
+  <img alt="Arc and Chrome" src="https://img.shields.io/badge/Arc%20%2F%20Chrome-Chromium-067647?logo=googlechrome">
+  <img alt="Anki" src="https://img.shields.io/badge/Anki-AnkiConnect-2563eb">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-475467">
+</p>
+
+---
+
+## English
+
+Wordflow removes the friction between encountering an English word and actually remembering it.
+
+Select a word in Arc or Chrome—or type one from Word, a PDF, a podcast, or anywhere else. Wordflow uses the surrounding context to create a rich Anki note with pronunciation, a learner-friendly meaning, definition, collocations, careful etymology, a memory hook, and natural examples. It then adds both recognition and production cards to your chosen deck.
 
 ```text
-Arc / Chrome 扩展 → macOS 原生快速输入窗
-        ↓
-macOS 本地服务（OpenAI Responses API）
-        ↓
-AnkiConnect → Anki 桌面版
+See a word → Capture once → Review in Anki
 ```
 
-浏览器扩展负责取词和快捷键；本地服务负责生成内容；AnkiConnect 负责把 Note 和两张卡片写入 Anki。所有服务只监听本机 `127.0.0.1`。
+### Why Wordflow
 
-## 功能
+- **Capture in seconds.** Right-click a selection or use a keyboard shortcut.
+- **Keep the original context.** Wordflow carries the sentence, page title, and source into the card.
+- **Learn actively.** Every note creates recognition and production cards instead of a passive word list.
+- **Stay in your flow.** The compact native window can stay on top and works without a mouse.
+- **Use your own system.** Choose any Anki deck; light and dark card themes are included.
+- **English and Chinese.** The extension, native window, and card explanations follow your browser/macOS language automatically.
 
-- Arc、Chrome、Edge 等 Chromium 浏览器：选词右键加入 Anki
-- 自动携带网页标题、URL 和附近上下文
-- 手动输入窗口，适合不能选中的链接、Word、PDF、Codex 等场景
-- 原生快速输入窗支持置顶、系统红黄绿按钮和全键盘操作
-- 快速窗口可读取现有 Anki 牌组、记住默认牌组，并用 `Command + D` 切换
-- 牌组使用向下展开的菜单；单词和上下文输入区采用统一的圆角样式
-- 录词时如发现 Anki 尚未运行，会自动在后台启动并等待 AnkiConnect
-- 成功提示显示 6 秒后自动消失；错误提示保留 10 秒，避免长期占用窗口空间
-- 快捷键会可靠地重新聚焦已置顶窗口；保存或取消后可回到原来的 App
-- 窗口保持紧凑；本次显示期间可调整大小，关闭后会恢复默认尺寸
-- 自动生成中文释义、IPA、英文定义、搭配、可靠词源、记忆提示和例句
-- 自动创建 `Vocabulary Inbox` 牌组和 `AI Vocabulary` Note Type
-- 每个单词生成 Recognition 和 Production 两张卡
-- 按 lemma + 词性查重
-- 卡片支持 Anki light mode 和 dark mode
-- 可选 OpenAI TTS 发音；默认只生成 IPA
+### What it is
 
-## 系统要求
+Wordflow is currently a local macOS workflow rather than a standalone cloud app:
 
-- macOS（当前一键安装脚本只支持 Mac）
-- [Python 3](https://www.python.org/downloads/macos/)
-- 可选：Xcode Command Line Tools，用于构建原生快速窗口；缺少时自动使用浏览器备用窗口
-- [Anki 桌面版](https://apps.ankiweb.net/)
-- Chromium 浏览器：Arc、Chrome 或 Edge
-- [OpenAI API Key](https://platform.openai.com/api-keys)；API 费用与 ChatGPT 订阅相互独立
+```text
+Arc / Chrome extension ─┐
+Native Quick Add window ├─→ Local Wordflow service → OpenAI API
+Desktop / PDF input ────┘                         ↓
+                                                AnkiConnect → Anki
+```
 
-## 安装
+The browser extension captures words and context. A local service generates the card content. AnkiConnect writes the note and two cards into Anki. Wordflow itself only listens on `127.0.0.1`.
 
-### 1. 下载 Wordflow
+### Requirements
 
-任选一种方式：
+- macOS 12 or later
+- [Anki Desktop](https://apps.ankiweb.net/)
+- Arc, Chrome, Edge, or another Chromium browser
+- Python 3
+- An [OpenAI API key](https://platform.openai.com/api-keys) — API billing is separate from a ChatGPT subscription
+- Optional: Xcode Command Line Tools for the native Quick Add window; Wordflow falls back to a browser window when Swift is unavailable
 
-- 在本仓库点击 **Code → Download ZIP**，解压后打开文件夹。
-- 或在终端运行：
+### Install
+
+#### 1. Download Wordflow
+
+Download the latest source archive from [Releases](https://github.com/yiyuke/wordflow-anki/releases), or clone the repository:
 
 ```bash
 git clone https://github.com/yiyuke/wordflow-anki.git
 cd wordflow-anki
 ```
 
-### 2. 安装 Anki 和 AnkiConnect
+#### 2. Install AnkiConnect
 
-1. 从 [Anki 官网](https://apps.ankiweb.net/)下载并安装桌面版 Anki。
-2. 打开 Anki，进入 **Tools → Add-ons → Get Add-ons**。
-3. 输入 AnkiConnect 代码 `2055492159`。
-4. 重启 Anki，并在使用 Wordflow 时保持 Anki 运行。
-5. 可选检查：浏览器打开 `http://127.0.0.1:8765`，看到 `Anki-Connect` 即正常。
+1. Install and open [Anki](https://apps.ankiweb.net/).
+2. Go to **Tools → Add-ons → Get Add-ons**.
+3. Enter the AnkiConnect code `2055492159`.
+4. Restart Anki.
 
-AnkiConnect 的项目说明与源码见 [AnkiConnect](https://git.sr.ht/~foosoft/anki-connect)。请保持默认监听地址 `127.0.0.1`，不要改成 `0.0.0.0`。
+Keep AnkiConnect on its default local address, `127.0.0.1:8765`. Its source and documentation are available at [AnkiConnect](https://git.sr.ht/~foosoft/anki-connect).
 
-### 3. 安装本地服务
+#### 3. Install the local service
 
-双击项目根目录的 `install.command`。它会：
+Double-click `install.command`, then double-click the installed `configure-api-key.command` and paste your OpenAI API key. The key is stored in macOS Keychain and is never committed to the repository.
 
-- 把公开程序文件复制到 `~/Library/Application Support/Wordflow`
-- 注册一个只在本机运行的后台服务
-- 在本机具备 Swift 编译器时构建原生快速输入窗
-- 打开已安装的 Wordflow 文件夹
+If macOS blocks a script, Control-click it, choose **Open**, and confirm once.
 
-如果 macOS 阻止运行，请按住 Control 点击文件，选择 **打开**，再确认一次。
+#### 4. Load the extension
 
-然后双击已安装目录中的 `configure-api-key.command`，粘贴 OpenAI API Key。输入不会显示；Key 会存进 macOS 钥匙串，不会写进项目或上传 GitHub。
+GitHub cannot provide one-click Chrome/Arc extension installation. Until Wordflow is published in the Chrome Web Store, load the trusted source folder manually:
 
-### 4. 安装浏览器扩展
+1. Open `arc://extensions` or `chrome://extensions`.
+2. Enable **Developer mode**.
+3. Choose **Load unpacked**.
+4. Select `~/Library/Application Support/Wordflow/extension`.
 
-目前 GitHub 版本需要手动加载，尚未发布到 Chrome Web Store。
+Arc can install Chrome Web Store extensions directly, so a future store release will work in both Arc and Chrome.
 
-Arc：
+### Use
 
-1. 打开 `arc://extensions`。
-2. 开启 **Developer mode**。
-3. 点击 **Load unpacked**。
-4. 选择 `~/Library/Application Support/Wordflow/extension`。
+- Select a word on a webpage and choose **Add to Anki** from the context menu.
+- Press `Option + Shift + A` to capture the current browser selection.
+- Press `Option + Shift + W` to open Quick Add from Word, PDFs, podcast notes, or any other app.
+- Press `Command + D` in Quick Add to choose a deck.
+- Press `Enter` to save and keep typing.
+- Press `Command + Enter` to save, leave the pinned card visible, and return focus to the previous app.
+- Press `Command + P` to pin or unpin the window; press `Esc` to close it.
 
-Chrome：
+New cards default to `Vocabulary Inbox`. Wordflow remembers later deck choices. If a shortcut conflicts with another extension, change it at `arc://extensions/shortcuts` or `chrome://extensions/shortcuts` and set the manual input shortcut to **Global**.
 
-1. 打开 `chrome://extensions`。
-2. 开启 **Developer mode**。
-3. 点击 **Load unpacked / 加载已解压的扩展程序**。
-4. 选择 `~/Library/Application Support/Wordflow/extension`。
+### What goes into a card
 
-Edge 的步骤相同，入口是 `edge://extensions`。
+- Selected surface form and dictionary lemma
+- IPA pronunciation
+- Concise meaning in English or Simplified Chinese
+- Learner-friendly English definition
+- Original context and a cloze version
+- Useful collocations
+- Conservative etymology and a separate memory hook
+- Two natural examples
+- Source title and URL
+- Optional OpenAI TTS audio
 
-## 使用
+Duplicate detection uses the lemma and part of speech. Each note creates a **Recognition** card and a **Production** card.
 
-- 在网页选中单词，右键选择 **加入 Anki**。
-- `Option + Shift + A`：把浏览器当前选中的单词直接加入 Anki。
-- `Option + Shift + W`：打开原生快速输入窗。只要 Arc/Chrome 正在运行，即使焦点在 Word、PDF 或其他 App，也可以使用。
-- 点击扩展图标：同样打开快速输入窗。
+### Privacy
 
-如快捷键冲突，可在 `arc://extensions/shortcuts` 或 `chrome://extensions/shortcuts` 修改，并把手动输入命令的作用域设为 **Global**。
+Wordflow has no account, analytics, advertising, or developer-operated server. The selected text, a bounded amount of nearby context, and the page title are sent directly from your Mac to the OpenAI API to generate the card. The page URL is stored in your local Anki note but is not included in the OpenAI request. Requests use `store: false`.
 
-新卡会出现在 Anki 的 `Vocabulary Inbox` 牌组。也可在 Anki 的 **Browse** 中搜索单词。
+See [PRIVACY.md](PRIVACY.md) for the complete bilingual disclosure and extension permission rationale.
 
-### 快速输入窗的键盘操作
+### Update and uninstall
 
-- 打开窗口时，光标自动落在“单词或短语”。
-- 即使置顶窗口已经显示，再按 `Option + Shift + W` 也会重新聚焦单词框。
-- 在单词框按 `↓` 或 `Tab`：进入上下文。
-- 在上下文按 `Tab`：进入“加入 Anki”按钮；按 `Shift + Tab` 返回单词框。
-- `Command + D`：打开牌组选择器；选择会成为浏览器右键添加和下次输入的默认牌组。
-- 在单词框按 `Enter`，或点击按钮：生成并保存，窗口保持打开，适合连续输入。
-- 在任意位置按 `Command + Enter`：生成并保存，然后激活原来的 App；置顶快速窗口会继续显示但不占用焦点。
-- `Command + P`：切换“置顶”。窗口会记住这个选择。
-- `Esc`：无论光标停在哪个输入框，都会关闭快速窗口；焦点回到原来的 App。
+To update, run `git pull`, run `install.command` again, then click **Reload** on the browser extensions page.
 
-原生窗口保留 macOS 的关闭、最小化和缩放按钮。默认尺寸只包裹录词所需内容，也允许在本次显示期间按需调整。
-用 `Esc` 或红色关闭按钮收起后，下次打开会恢复紧凑默认尺寸；窗口仍显示期间的手动拉伸不会被打断。
+To uninstall, double-click `uninstall.command`. Existing Anki cards remain untouched. The script does not automatically remove the browser extension or Keychain API key.
 
-## Word 和桌面 PDF
-
-最简单的方式是按 `Option + Shift + W`，手动输入单词。
-
-也可以选中单词后按 `Command + C`，再双击：
-
-```text
-~/Library/Application Support/Wordflow/macos/add-copied-text.command
-```
-
-如果 PDF 是扫描图片，系统必须先通过 OCR 识别文字；Wordflow 本身暂不包含 OCR。
-
-## 设置与更新
-
-本地设置保存在：
-
-```text
-~/Library/Application Support/Wordflow/.env
-```
-
-窗口中选择的默认牌组与最近读取的牌组列表保存在：
-
-```text
-~/Library/Application Support/Wordflow/preferences.json
-```
-
-不需要手动编辑这个文件；`ANKI_DECK` 仍作为第一次运行和无法读取 Anki 时的后备牌组。
-
-默认使用 OpenAI `gpt-5.6-luna`，适合高频、成本敏感的结构化制卡。可以修改 `OPENAI_MODEL`。项目使用 Responses API 且设置 `store: false`。
-
-为缩短简单制卡任务的等待时间，默认设置 `OPENAI_REASONING_EFFORT=none`；如更重视复杂语义分析，可改为 `low`。本地服务还会缓存已经确认过的 Anki 牌组与 Note Type，避免每次重复检查。
-
-可选开启发音音频：
-
-```text
-ENABLE_TTS=1
-TTS_MODEL=tts-1
-TTS_VOICE=alloy
-```
-
-修改后重启服务：
-
-```bash
-launchctl kickstart -k "gui/$(id -u)/com.wordflow.to-anki"
-```
-
-更新 GitHub 版本：
-
-```bash
-git pull
-```
-
-随后重新运行 `install.command`，并在浏览器扩展页面点击扩展的 **Reload**。
-
-## 卸载
-
-双击 `uninstall.command`。它会移除本地服务和安装文件，但不会删除：
-
-- 已经生成的 Anki 卡片
-- 浏览器中的扩展（请在扩展页面手动移除）
-- 钥匙串中的 API Key
-
-如需同时删除 Key：
-
-```bash
-security delete-generic-password -s com.wordflow.openai
-```
-
-## Chrome Web Store 与 Arc
-
-这个扩展可以发布到 Chrome Web Store。发布后，Chrome 用户可以一键安装；Arc 是 Chromium 浏览器，也可以直接安装 Chrome Web Store 中的扩展，因此不需要再单独发布一个“Arc 商店版”。
-
-GitHub 仓库和商店不是二选一：
-
-- GitHub 用来公开源码、文档、Issue 和版本更新。
-- Chrome Web Store 用来提供更方便、可自动更新的扩展安装。
-- 即使扩展上架商店，用户仍需在 Mac 上安装本地服务、Anki 和 AnkiConnect。
-
-上架前还需要准备商店图标、截图、隐私披露与支持页面，注册 Chrome Web Store 开发者账号并支付一次性注册费，然后提交审核。参考 Google 官方的[开发者注册](https://developer.chrome.com/docs/webstore/register)和[发布流程](https://developer.chrome.com/docs/webstore/publish)。Arc 的官方说明见[在 Arc 中使用扩展](https://resources.arc.net/hc/en-us/articles/19434259167767-Extensions-in-Arc-How-to-Import-Add-Open)。
-
-## 隐私与安全
-
-- `.env` 已被 Git 忽略，API Key 默认保存在 macOS 钥匙串。
-- 本地服务仅监听 `127.0.0.1:8766`；AnkiConnect 默认监听 `127.0.0.1:8765`。
-- 写入接口拒绝普通网页来源，并要求 Wordflow 客户端标识；网页不能直接借用本地服务生成或写入卡片。
-- 浏览器捕获会向 OpenAI API 发送：选中文字、最多一小段附近上下文和页面标题；不会上传整个网页或整个文档。
-- 页面内容在提示词中被视为数据，不会被当成模型指令执行。
-- 页面 URL 会写入本地 Anki 卡片作为来源，但不会放进 OpenAI 请求。
-- 使用 OpenAI API 时，请同时遵守 OpenAI 的数据与使用政策。
-
-## 开发与测试
-
-无需第三方 Python 包：
+### Development
 
 ```bash
 python3 -m unittest discover -s local_service/tests -v
@@ -227,16 +147,138 @@ node --check extension/popup.js
 native/build-app.sh
 ```
 
-离线 mock 测试：
+Contributions and bug reports are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), the [launch kit](docs/LAUNCH.md), and the [changelog](CHANGELOG.md).
+
+---
+
+## 简体中文
+
+Wordflow 解决的是一个很小、但每天都会打断学习的问题：**看到生词以后，怎样马上把它变成真正会复习的内容？**
+
+你可以在 Arc 或 Chrome 里选中单词，也可以从 Word、PDF、播客笔记或其他软件手动输入。Wordflow 会结合原句生成发音、释义、英文定义、搭配、可靠词源、记忆提示和自然例句，然后把它直接加入你选择的 Anki 牌组，并生成识别与回忆两张卡。
+
+```text
+遇见生词 → 捕捉一次 → 回到 Anki 复习
+```
+
+### 为什么用 Wordflow
+
+- **几秒钟完成录词。** 选词右键，或者直接按快捷键。
+- **保留真实语境。** 原句、页面标题和来源会一起进入卡片。
+- **不是被动收藏。** 每条 Note 自动生成 Recognition 和 Production 两张卡。
+- **不打断正在做的事。** 紧凑的原生窗口支持置顶和全键盘操作。
+- **继续使用自己的 Anki。** 可以选择任意牌组，卡片支持浅色与深色模式。
+- **中英双语。** 扩展、原生窗口和卡片解释会自动跟随浏览器或 macOS 语言。
+
+### 它是什么
+
+Wordflow 目前不是云端账号型 App，而是一套只在 Mac 本地运行的工作流：
+
+```text
+Arc / Chrome 扩展 ─┐
+原生快速输入窗口 ──┼─→ Wordflow 本地服务 → OpenAI API
+桌面 / PDF 输入 ───┘                         ↓
+                                            AnkiConnect → Anki
+```
+
+浏览器扩展负责取词和上下文，本地服务负责生成卡片内容，AnkiConnect 负责把 Note 和两张卡写进 Anki。Wordflow 本身只监听 `127.0.0.1`。
+
+### 系统要求
+
+- macOS 12 或更高版本
+- [Anki 桌面版](https://apps.ankiweb.net/)
+- Arc、Chrome、Edge 或其他 Chromium 浏览器
+- Python 3
+- [OpenAI API Key](https://platform.openai.com/api-keys)；API 费用与 ChatGPT 订阅相互独立
+- 可选：Xcode Command Line Tools，用于构建原生快速窗口；没有 Swift 时会自动使用浏览器备用窗口
+
+### 安装
+
+#### 1. 下载 Wordflow
+
+从 [Releases](https://github.com/yiyuke/wordflow-anki/releases) 下载最新源码压缩包，或在终端运行：
 
 ```bash
-cp .env.example .env
-MOCK_OPENAI=1 MOCK_ANKI=1 ./start-service.command
-curl -X POST http://127.0.0.1:8766/api/capture \
-  -H 'Content-Type: application/json' \
-  -H 'X-Wordflow-Client: wordflow-local' \
-  -d '{"text":"meticulous","context":"She is meticulous about every detail."}'
+git clone https://github.com/yiyuke/wordflow-anki.git
+cd wordflow-anki
 ```
+
+#### 2. 安装 AnkiConnect
+
+1. 安装并打开 [Anki](https://apps.ankiweb.net/)。
+2. 进入 **Tools → Add-ons → Get Add-ons**。
+3. 输入 AnkiConnect 代码 `2055492159`。
+4. 重启 Anki。
+
+请保留 AnkiConnect 的默认本地地址 `127.0.0.1:8765`。项目说明和源码见 [AnkiConnect](https://git.sr.ht/~foosoft/anki-connect)。
+
+#### 3. 安装本地服务
+
+双击 `install.command`。安装完成后，再双击已安装目录中的 `configure-api-key.command`，粘贴 OpenAI API Key。Key 会保存在 macOS 钥匙串，不会写入 GitHub 仓库。
+
+如果 macOS 阻止脚本运行，请按住 Control 点击文件，选择 **打开**，再确认一次。
+
+#### 4. 加载浏览器扩展
+
+GitHub 不能像扩展商店一样一键安装 Chrome/Arc 扩展。在 Wordflow 正式上架 Chrome Web Store 前，需要手动加载可信的源码目录：
+
+1. 打开 `arc://extensions` 或 `chrome://extensions`。
+2. 开启 **Developer mode**。
+3. 点击 **Load unpacked / 加载已解压的扩展程序**。
+4. 选择 `~/Library/Application Support/Wordflow/extension`。
+
+Arc 可以直接使用 Chrome Web Store 扩展，因此未来只需发布一个商店版本。
+
+### 使用
+
+- 在网页选中单词，右键选择 **加入 Anki**。
+- `Option + Shift + A`：捕捉浏览器当前选中的单词。
+- `Option + Shift + W`：从 Word、PDF、播客笔记或其他 App 打开快速输入窗。
+- `Command + D`：选择 Anki 牌组。
+- `Enter`：保存并继续输入。
+- `Command + Enter`：保存后把焦点交回之前的 App；置顶窗口继续显示。
+- `Command + P`：切换置顶；`Esc`：关闭窗口。
+
+新卡默认加入 `Vocabulary Inbox`。之后选择的牌组会被记住。如果快捷键冲突，可在 `arc://extensions/shortcuts` 或 `chrome://extensions/shortcuts` 修改，并把手动输入快捷键设成 **Global**。
+
+### 每张卡包含什么
+
+- 选中的词形和字典原形
+- IPA 发音
+- 中文或英文简明释义
+- 适合学习者的英文定义
+- 原始上下文与挖空版本
+- 常用搭配
+- 谨慎处理的词源和独立的记忆提示
+- 两个自然例句
+- 来源标题与 URL
+- 可选 OpenAI TTS 发音音频
+
+查重使用 lemma + 词性。每条 Note 会生成 **Recognition** 和 **Production** 两张卡。
+
+### 隐私
+
+Wordflow 没有账号、广告、数据分析或开发者运营的服务器。选中的文字、有限长度的附近上下文和页面标题会从你的 Mac 直接发送到 OpenAI API，用于生成卡片。页面 URL 只写入本地 Anki，不会包含在 OpenAI 请求中。请求设置为 `store: false`。
+
+完整的中英双语说明及浏览器权限用途见 [PRIVACY.md](PRIVACY.md)。
+
+### 更新与卸载
+
+更新时运行 `git pull`，重新运行 `install.command`，然后在浏览器扩展页面点击 **Reload**。
+
+卸载时双击 `uninstall.command`。已经生成的 Anki 卡片不会被删除；浏览器扩展和钥匙串中的 API Key 需要按需手动移除。
+
+### 开发与贡献
+
+```bash
+python3 -m unittest discover -s local_service/tests -v
+node --check extension/service-worker.js
+node --check extension/content.js
+node --check extension/popup.js
+native/build-app.sh
+```
+
+欢迎提交 Issue 和 Pull Request。更多信息见 [贡献指南](CONTRIBUTING.md)、[发布素材与步骤](docs/LAUNCH.md)和[更新日志](CHANGELOG.md)。
 
 ## License
 

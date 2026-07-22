@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -10,25 +10,25 @@
     <main>
       <header>
         <div>
-          <h1>快速添加到 Anki</h1>
-          <p>打开窗口：⌥⇧W</p>
+          <h1 data-i18n="popupTitle">Quick Add to Anki</h1>
+          <p data-i18n="openWindow">Open window: ⌥⇧W</p>
         </div>
       </header>
 
-      <label for="word">单词或短语</label>
-      <input id="word" autocomplete="off" placeholder="meticulous" autofocus />
+      <label for="word" data-i18n="wordLabel">Word or phrase</label>
+      <input id="word" autocomplete="off" placeholder="e.g. serendipity" data-i18n-placeholder="wordPlaceholder" autofocus />
 
-      <label for="deck">保存到 Anki 牌组</label>
+      <label for="deck" data-i18n="deckLabel">Save to Anki deck</label>
       <select id="deck" disabled>
-        <option>读取牌组…</option>
+        <option data-i18n="loadingDecks">Loading decks…</option>
       </select>
 
-      <label for="context">例句或上下文（可选）</label>
-      <textarea id="context" rows="3" placeholder="粘贴看到这个词的原句"></textarea>
+      <label for="context" data-i18n="contextLabel">Example or context (optional)</label>
+      <textarea id="context" rows="3" placeholder="Paste the sentence where you found it" data-i18n-placeholder="contextPlaceholder"></textarea>
 
-      <button id="add">生成并加入 Anki</button>
+      <button id="add" data-i18n="addButton">Generate and add to Anki</button>
       <p id="result" role="status"></p>
-      <p class="hint">↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存切回 · Esc 关闭</p>
+      <p class="hint" data-i18n="keyboardHint">↓/Tab move · ⌘D deck · ⌘↩ save &amp; return · Esc close</p>
     </main>
     <script src="popup.js"></script>
   </body>

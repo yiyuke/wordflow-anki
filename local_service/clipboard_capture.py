@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import locale
 import socket
 import subprocess
 import sys
@@ -21,11 +22,14 @@ def clipboard_text() -> str:
 
 
 def main() -> None:
+    locale_name = (locale.getlocale()[0] or "").lower()
+    default_language = "zh" if locale_name.startswith("zh") else "en"
     parser = argparse.ArgumentParser(description="Add selected or copied text to Anki through Wordflow")
     parser.add_argument("text", nargs="?", help="word or phrase; defaults to stdin/clipboard")
     parser.add_argument("--context", default="", help="optional source sentence")
     parser.add_argument("--source-title", default="Desktop selection")
     parser.add_argument("--service-url", default="http://127.0.0.1:8766")
+    parser.add_argument("--language", choices=("zh", "en"), default=default_language)
     args = parser.parse_args()
 
     text = args.text or (sys.stdin.read() if not sys.stdin.isatty() else clipboard_text())
@@ -35,6 +39,7 @@ def main() -> None:
         "source_title": args.source_title,
         "source_url": "",
         "source_type": "desktop",
+        "language": args.language,
     }
     request = urllib.request.Request(
         f"{args.service_url.rstrip('/')}/api/capture",
@@ -58,12 +63,18 @@ def main() -> None:
         urllib.error.URLError,
     ) as error:
         reason = error.reason if isinstance(error, urllib.error.URLError) else error
-        raise SystemExit(f"无法连接本地服务：{reason}") from error
+        message = f"无法连接本地服务：{reason}" if args.language == "zh" else f"Could not connect to Wordflow: {reason}"
+        raise SystemExit(message) from error
 
     if not data.get("ok"):
-        raise SystemExit(data.get("error", "加入失败"))
-    status = "已存在" if data.get("duplicate") else "已加入"
-    print(f"{status}：{data['card']['word']}")
+        fallback = "加入失败" if args.language == "zh" else "Could not add the card"
+        raise SystemExit(data.get("error", fallback))
+    if args.language == "zh":
+        status = "已存在" if data.get("duplicate") else "已加入"
+        print(f"{status}：{data['card']['word']}")
+    else:
+        status = "Already exists" if data.get("duplicate") else "Added"
+        print(f"{status}: {data['card']['word']}")
 
 
 if __name__ == "__main__":

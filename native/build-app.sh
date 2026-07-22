@@ -7,7 +7,7 @@ APP="$OUTPUT_ROOT/Wordflow Quick Add.app"
 CONTENTS="$APP/Contents"
 
 if ! command -v swiftc >/dev/null 2>&1; then
-  echo "未找到 swiftc，跳过原生快速窗口。"
+  echo "未找到 swiftc，跳过原生快速窗口。 / swiftc was not found; skipping the native quick window."
   exit 2
 fi
 
@@ -21,5 +21,6 @@ fi
   "$ROOT/WordflowQuickAdd.swift" \
   -o "$CONTENTS/MacOS/WordflowQuickAdd"
 /bin/cp "$ROOT/Info.plist" "$CONTENTS/Info.plist"
+/bin/cp "$ROOT/Wordflow.icns" "$CONTENTS/Resources/Wordflow.icns"
 /usr/bin/touch "$APP"
 echo "$APP"

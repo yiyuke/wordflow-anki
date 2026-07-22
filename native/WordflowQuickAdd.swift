@@ -2,6 +2,19 @@ import AppKit
 import Darwin
 import Foundation
 
+private enum Copy {
+    static let languageCode: String = {
+        let override = ProcessInfo.processInfo.environment["WORDFLOW_UI_LANGUAGE"]?.lowercased()
+        if override == "zh" || override == "en" { return override! }
+        return Locale.preferredLanguages.first?.lowercased().hasPrefix("zh") == true ? "zh" : "en"
+    }()
+    static let isChinese = languageCode == "zh"
+
+    static func text(_ chinese: String, _ english: String) -> String {
+        isChinese ? chinese : english
+    }
+}
+
 private final class InputSurfaceView: NSView {
     override var wantsUpdateLayer: Bool { true }
 
@@ -149,17 +162,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         content.translatesAutoresizingMaskIntoConstraints = false
         window.contentView = content
 
-        let title = label("快速添加到 Anki", size: 21, weight: .bold, color: .labelColor)
-        let subtitle = label("打开窗口：⌥⇧W", size: 13, weight: .semibold, color: .controlAccentColor)
+        let title = label(Copy.text("快速添加到 Anki", "Quick Add to Anki"), size: 21, weight: .bold, color: .labelColor)
+        let subtitle = label(Copy.text("打开窗口：⌥⇧W", "Open window: ⌥⇧W"), size: 13, weight: .semibold, color: .controlAccentColor)
         let titleStack = NSStackView(views: [title, subtitle])
         titleStack.orientation = .vertical
         titleStack.alignment = .leading
         titleStack.spacing = 3
 
-        pinButton = NSButton(checkboxWithTitle: "置顶", target: self, action: #selector(pinClicked))
+        pinButton = NSButton(checkboxWithTitle: Copy.text("置顶", "Pin"), target: self, action: #selector(pinClicked))
         pinButton.font = .systemFont(ofSize: 13, weight: .medium)
         pinButton.contentTintColor = .labelColor
-        pinButton.toolTip = "始终显示在其他窗口上方（⌘P）"
+        pinButton.toolTip = Copy.text("始终显示在其他窗口上方（⌘P）", "Keep above other windows (⌘P)")
         pinButton.setAccessibilityIdentifier("pinButton")
 
         let headerSpacer = NSView()
@@ -169,17 +182,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         header.alignment = .centerY
         header.spacing = 12
 
-        let wordLabel = label("单词或短语", size: 14, weight: .semibold, color: .labelColor)
+        let wordLabel = label(Copy.text("单词或短语", "Word or phrase"), size: 14, weight: .semibold, color: .labelColor)
         let wordHeaderSpacer = NSView()
         wordHeaderSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let deckLabel = label("保存到牌组", size: 14, weight: .semibold, color: .labelColor)
+        let deckLabel = label(Copy.text("保存到牌组", "Deck"), size: 14, weight: .semibold, color: .labelColor)
         deckButton = NSPopUpButton(frame: .zero, pullsDown: true)
         deckButton.controlSize = .regular
         deckButton.font = .systemFont(ofSize: 14, weight: .medium)
-        deckButton.addItem(withTitle: "读取牌组…")
+        deckButton.addItem(withTitle: Copy.text("读取牌组…", "Loading decks…"))
         deckButton.isEnabled = false
         deckButton.setAccessibilityIdentifier("deckButton")
-        deckButton.setAccessibilityLabel("保存到 Anki 牌组")
+        deckButton.setAccessibilityLabel(Copy.text("保存到 Anki 牌组", "Save to Anki deck"))
         deckButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 164).isActive = true
         deckButton.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
         deckButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
@@ -192,7 +205,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         wordHeader.alignment = .centerY
         wordHeader.spacing = 16
         wordField = NSTextField()
-        wordField.placeholderString = "例如：serendipity"
+        wordField.placeholderString = Copy.text("例如：serendipity", "e.g. serendipity")
         wordField.font = .systemFont(ofSize: 16)
         wordField.delegate = self
         wordField.isBezeled = false
@@ -211,7 +224,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             wordField.centerYAnchor.constraint(equalTo: wordSurface.centerYAnchor)
         ])
 
-        let contextLabel = label("例句或上下文（可选）", size: 14, weight: .semibold, color: .labelColor)
+        let contextLabel = label(Copy.text("例句或上下文（可选）", "Example or context (optional)"), size: 14, weight: .semibold, color: .labelColor)
         contextView = ContextTextView()
         contextView.font = .systemFont(ofSize: 15)
         contextView.isRichText = false
@@ -219,7 +232,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         contextView.isAutomaticQuoteSubstitutionEnabled = false
         contextView.isAutomaticDashSubstitutionEnabled = false
         contextView.textContainerInset = NSSize(width: 10, height: 9)
-        contextView.setAccessibilityLabel("例句或上下文，可选")
+        contextView.setAccessibilityLabel(Copy.text("例句或上下文，可选", "Example or context, optional"))
         contextView.setAccessibilityIdentifier("contextField")
         contextView.focusWordHandler = { [weak self] in self?.focusWord() }
         contextView.focusNextHandler = { [weak self] in self?.focusAddButton() }
@@ -261,8 +274,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         statusRow.detachesHiddenViews = true
         statusRow.heightAnchor.constraint(equalToConstant: 18).isActive = true
 
-        let hint = label("↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存切回 · Esc 关闭", size: 12, weight: .medium, color: .secondaryLabelColor)
-        addButton = NSButton(title: "加入 Anki", target: self, action: #selector(addClicked))
+        let hint = label(Copy.text(
+            "↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存切回 · Esc 关闭",
+            "Tab move · ⌘D deck · ⌘↩ return · Esc close"
+        ), size: 12, weight: .medium, color: .secondaryLabelColor)
+        addButton = NSButton(title: Copy.text("加入 Anki", "Add to Anki"), target: self, action: #selector(addClicked))
         addButton.bezelStyle = .rounded
         addButton.controlSize = .large
         addButton.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -352,23 +368,30 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func shortMessage(for error: Error) -> String {
         let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        if message.contains("Anki 启动失败") {
-            return "Anki 启动失败，请手动打开"
+        if message.contains("Anki 启动失败") || message.localizedCaseInsensitiveContains("could not open Anki") {
+            return Copy.text("Anki 启动失败，请手动打开", "Could not open Anki")
         }
-        if message.contains("AnkiConnect") || message.contains("Anki 未连接") || message.contains("连接中断") {
-            return "Anki 未连接，请稍后重试"
+        if message.contains("AnkiConnect") || message.contains("Anki 未连接") || message.contains("连接中断")
+            || message.localizedCaseInsensitiveContains("Anki is not connected") {
+            return Copy.text("Anki 未连接，请稍后重试", "Anki is not connected")
         }
         if message.contains("OPENAI_API_KEY") || message.localizedCaseInsensitiveContains("API Key") {
-            return "请先配置 OpenAI API Key"
+            return Copy.text("请先配置 OpenAI API Key", "Set up your OpenAI API key first")
         }
-        if message.localizedCaseInsensitiveContains("OpenAI") || message.contains("网络连接失败") {
-            return "网络连接失败，请稍后重试"
+        if message.localizedCaseInsensitiveContains("OpenAI") || message.contains("网络连接失败")
+            || message.localizedCaseInsensitiveContains("network error") {
+            return Copy.text("网络连接失败，请稍后重试", "Network error — try again")
         }
-        if message.localizedCaseInsensitiveContains("could not connect") || message.contains("无法连接本地服务") {
-            return "Wordflow 服务未连接"
+        if message.localizedCaseInsensitiveContains("could not connect") || message.contains("无法连接本地服务")
+            || message.localizedCaseInsensitiveContains("local service") {
+            return Copy.text("Wordflow 服务未连接", "Wordflow service is not connected")
         }
-        guard message.count > 42 else { return message }
-        return String(message.prefix(41)) + "…"
+        if message.contains("牌组不存在") || message.localizedCaseInsensitiveContains("deck does not exist") {
+            return Copy.text("Anki 牌组不存在", "Anki deck not found")
+        }
+        let limit = Copy.isChinese ? 42 : 58
+        guard message.count > limit else { return message }
+        return String(message.prefix(limit - 1)) + "…"
     }
 
     private func showStatus(
@@ -550,7 +573,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                     throw NSError(
                         domain: "Wordflow",
                         code: http?.statusCode ?? -1,
-                        userInfo: [NSLocalizedDescriptionKey: json?["error"] as? String ?? "无法读取牌组"]
+                        userInfo: [NSLocalizedDescriptionKey: json?["error"] as? String
+                            ?? Copy.text("无法读取牌组", "Could not load Anki decks")]
                     )
                 }
                 let selected = json?["selected"] as? String ?? decks[0]
@@ -581,7 +605,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                     throw NSError(
                         domain: "Wordflow",
                         code: http?.statusCode ?? -1,
-                        userInfo: [NSLocalizedDescriptionKey: json?["error"] as? String ?? "牌组选择未保存"]
+                        userInfo: [NSLocalizedDescriptionKey: json?["error"] as? String
+                            ?? Copy.text("牌组选择未保存", "Could not save the deck choice")]
                     )
                 }
             } catch {
@@ -628,7 +653,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         guard !isSubmitting else { return }
         let word = wordField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !word.isEmpty else {
-            showStatus("请先输入一个单词或短语", color: .systemRed, clearAfter: 10)
+            showStatus(Copy.text("请先输入一个单词或短语", "Enter a word or phrase first"), color: .systemRed, clearAfter: 10)
             NSSound.beep()
             focusWord()
             return
@@ -638,13 +663,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         setControlsEnabled(false)
         progress.isHidden = false
         progress.startAnimation(nil)
-        showStatus("正在生成词卡…")
+        showStatus(Copy.text("正在生成词卡…", "Creating your card…"))
 
         let payload: [String: Any] = [
             "text": word,
             "context": contextView.string.trimmingCharacters(in: .whitespacesAndNewlines),
             "deck": selectedDeck(),
-            "source_title": "Wordflow 快速添加",
+            "language": Copy.languageCode,
+            "source_title": Copy.text("Wordflow 快速添加", "Wordflow Quick Add"),
             "source_url": "",
             "source_type": "native-manual"
         ]
@@ -666,7 +692,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                     throw NSError(
                         domain: "Wordflow",
                         code: http?.statusCode ?? -1,
-                        userInfo: [NSLocalizedDescriptionKey: json?["error"] as? String ?? "加入失败"]
+                        userInfo: [NSLocalizedDescriptionKey: json?["error"] as? String
+                            ?? Copy.text("加入失败", "Could not add the card")]
                     )
                 }
                 let duplicate = json?["duplicate"] as? Bool ?? false
@@ -675,8 +702,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 let savedDeck = json?["deck"] as? String ?? selectedDeck()
                 finishSubmission(
                     message: duplicate
-                        ? "“\(savedWord)” 已存在于 \(savedDeck)"
-                        : "已加入 \(savedDeck)：\(savedWord)",
+                        ? Copy.text("“\(savedWord)” 已存在于 \(savedDeck)", "“\(savedWord)” already exists in \(savedDeck)")
+                        : Copy.text("已加入 \(savedDeck)：\(savedWord)", "Added to \(savedDeck): \(savedWord)"),
                     success: true
                 )
                 if !duplicate {

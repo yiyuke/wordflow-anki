@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python tests
+        run: python3 -m unittest discover -s local_service/tests -v
+      - name: JavaScript syntax
+        run: |
+          node --check extension/service-worker.js
+          node --check extension/content.js
+          node --check extension/popup.js
+      - name: Validate metadata
+        run: |
+          plutil -lint native/Info.plist
+          python3 -m json.tool extension/manifest.json >/dev/null
+          python3 -m json.tool extension/_locales/en/messages.json >/dev/null
+          python3 -m json.tool extension/_locales/zh_CN/messages.json >/dev/null
+      - name: Build native app
+        run: native/build-app.sh /tmp/wordflow-build
