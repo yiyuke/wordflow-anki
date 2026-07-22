@@ -161,6 +161,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         progress.style = .spinning
         progress.controlSize = .small
         progress.isDisplayedWhenStopped = false
+        progress.isHidden = true
 
         statusLabel = label("", size: 13, weight: .medium, color: .secondaryLabelColor)
         statusLabel.lineBreakMode = .byTruncatingTail
@@ -171,6 +172,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         statusRow.orientation = .horizontal
         statusRow.alignment = .centerY
         statusRow.spacing = 7
+        statusRow.detachesHiddenViews = true
         statusRow.heightAnchor.constraint(equalToConstant: 18).isActive = true
 
         let hint = label("↓ / Tab 移动焦点  ·  ⌘↩ 保存  ·  Esc 收起", size: 12, weight: .medium, color: .secondaryLabelColor)
@@ -323,6 +325,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
         isSubmitting = true
         setControlsEnabled(false)
+        progress.isHidden = false
         progress.startAnimation(nil)
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.stringValue = "正在生成词卡…"
@@ -372,6 +375,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private func finishSubmission(message: String, success: Bool) {
         isSubmitting = false
         progress.stopAnimation(nil)
+        progress.isHidden = true
         setControlsEnabled(true)
         statusLabel.textColor = success ? .systemGreen : .systemRed
         statusLabel.stringValue = message

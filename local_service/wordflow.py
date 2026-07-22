@@ -3,12 +3,15 @@ from __future__ import annotations
 import base64
 import hashlib
 import html
+import http.client
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -17,6 +20,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 
 ROOT = Path(__file__).resolve().parent.parent
+DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 NOTE_FIELDS = [
     "Word",
     "Lemma",
@@ -168,25 +172,62 @@ Rules:
 """
 
 
-def _request_json(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeout: int = 60) -> Dict[str, Any]:
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json", **headers},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as error:
-        body = error.read().decode("utf-8", errors="replace")
+def _request_json(
+    url: str,
+    payload: Dict[str, Any],
+    headers: Dict[str, str],
+    timeout: int = 60,
+    *,
+    service_name: str = "远程服务",
+    retries: int = 0,
+    bypass_proxy: bool = False,
+) -> Dict[str, Any]:
+    attempts = retries + 1
+    for attempt in range(attempts):
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={"Content-Type": "application/json", **headers},
+            method="POST",
+        )
         try:
-            message = json.loads(body).get("error", {}).get("message", body)
-        except json.JSONDecodeError:
-            message = body
-        raise RuntimeError(f"API 请求失败 ({error.code})：{message}") from error
-    except urllib.error.URLError as error:
-        raise RuntimeError(f"无法连接到 {url}：{error.reason}") from error
+            open_request = DIRECT_OPENER.open if bypass_proxy else urllib.request.urlopen
+            with open_request(request, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            body = error.read().decode("utf-8", errors="replace")
+            try:
+                parsed = json.loads(body)
+                api_error = parsed.get("error", {})
+                message = api_error.get("message", body) if isinstance(api_error, dict) else str(api_error)
+            except json.JSONDecodeError:
+                message = body
+            raise RuntimeError(f"{service_name} 请求失败 ({error.code})：{message}") from error
+        except (
+            http.client.RemoteDisconnected,
+            ConnectionResetError,
+            BrokenPipeError,
+            socket.timeout,
+            TimeoutError,
+            urllib.error.URLError,
+        ) as error:
+            reason = error.reason if isinstance(error, urllib.error.URLError) else error
+            print(
+                f"[wordflow] {service_name} connection failure "
+                f"({attempt + 1}/{attempts}): {type(reason).__name__}: {reason}",
+                file=sys.stderr,
+                flush=True,
+            )
+            if attempt < retries:
+                time.sleep(0.35 * (attempt + 1))
+                continue
+            if service_name == "AnkiConnect":
+                raise RuntimeError(
+                    "AnkiConnect 连接中断；请确认 Anki 已完全启动，并已安装和启用 AnkiConnect"
+                ) from error
+            raise RuntimeError(f"{service_name} 暂时断开了连接；自动重试后仍未恢复，请检查网络后再试") from error
+
+    raise RuntimeError(f"{service_name} 请求失败")
 
 
 def extract_response_text(response: Dict[str, Any]) -> str:
@@ -283,6 +324,8 @@ class OpenAICardGenerator:
             payload,
             {"Authorization": f"Bearer {self.config.openai_api_key}"},
             timeout=90,
+            service_name="OpenAI",
+            retries=1,
         )
         card = json.loads(extract_response_text(response))
         return normalize_card(card, capture)
@@ -439,7 +482,16 @@ class AnkiClient:
         payload: Dict[str, Any] = {"action": action, "version": 6, "params": params}
         if self.config.anki_api_key:
             payload["key"] = self.config.anki_api_key
-        response = _request_json(self.config.anki_url, payload, {}, timeout=15)
+        safe_to_retry = action in {"version", "deckNames", "modelNames", "findNotes"}
+        response = _request_json(
+            self.config.anki_url,
+            payload,
+            {},
+            timeout=15,
+            service_name="AnkiConnect",
+            retries=1 if safe_to_retry else 0,
+            bypass_proxy=True,
+        )
         if response.get("error") is not None:
             raise RuntimeError(f"AnkiConnect：{response['error']}")
         return response.get("result")

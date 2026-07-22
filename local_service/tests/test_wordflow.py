@@ -4,8 +4,9 @@ import re
 import sys
 import unittest
 from dataclasses import replace
+from http.client import RemoteDisconnected
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 SERVICE_DIR = Path(__file__).resolve().parents[1]
@@ -17,6 +18,7 @@ from wordflow import (  # noqa: E402
     Config,
     OpenAICardGenerator,
     WordflowApp,
+    _request_json,
     extract_response_text,
     html_items,
     identity_tag,
@@ -139,6 +141,51 @@ class WordflowTests(unittest.TestCase):
         payload = request_json.call_args.args[1]
         self.assertEqual(payload["reasoning"], {"effort": "none"})
         self.assertEqual(payload["max_output_tokens"], 1400)
+
+    def test_remote_disconnect_is_retried_and_names_the_service(self):
+        with (
+            patch(
+                "wordflow.urllib.request.urlopen",
+                side_effect=RemoteDisconnected("Remote end closed connection without response"),
+            ) as urlopen,
+            patch("wordflow.time.sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "OpenAI.*自动重试"):
+                _request_json(
+                    "https://example.invalid/v1/responses",
+                    {"input": "test"},
+                    {},
+                    service_name="OpenAI",
+                    retries=1,
+                )
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once()
+
+    def test_anki_disconnect_has_actionable_message(self):
+        with patch(
+            "wordflow.DIRECT_OPENER.open",
+            side_effect=RemoteDisconnected("Remote end closed connection without response"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "AnkiConnect.*Anki 已完全启动"):
+                _request_json(
+                    "http://127.0.0.1:8765",
+                    {"action": "version", "version": 6},
+                    {},
+                    service_name="AnkiConnect",
+                    bypass_proxy=True,
+                )
+
+    def test_anki_requests_explicitly_bypass_system_proxy(self):
+        client = AnkiClient(replace(mock_config(), mock_anki=False))
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"result": 6, "error": null}'
+        with (
+            patch("wordflow.DIRECT_OPENER.open", return_value=response) as direct_open,
+            patch("wordflow.urllib.request.urlopen") as proxied_open,
+        ):
+            self.assertEqual(client.invoke("version"), 6)
+        direct_open.assert_called_once()
+        proxied_open.assert_not_called()
 
     def test_card_colors_meet_aa_contrast_in_light_and_dark_modes(self):
         light_block = re.search(r"\.card\s*\{(.*?)\n\}", CARD_CSS, re.DOTALL)

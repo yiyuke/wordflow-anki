@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict
@@ -86,10 +87,16 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as error:
             self._json({"ok": False, "error": str(error)}, 400)
         except Exception as error:
+            timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+            sys.stderr.write(
+                f"[wordflow] {timestamp} {path} failed: {type(error).__name__}: {error}\n"
+            )
+            sys.stderr.flush()
             self._json({"ok": False, "error": str(error)}, 502)
 
     def log_message(self, format: str, *args: Any) -> None:
-        sys.stderr.write(f"[wordflow] {self.address_string()} {format % args}\n")
+        timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+        sys.stderr.write(f"[wordflow] {timestamp} {self.address_string()} {format % args}\n")
 
 
 def main() -> None:
