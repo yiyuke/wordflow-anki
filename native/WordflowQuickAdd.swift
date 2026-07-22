@@ -11,7 +11,12 @@ private final class InputSurfaceView: NSView {
             calibratedWhite: isDark ? 0.16 : 0.96,
             alpha: 1
         ).cgColor
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(isDark ? 0.9 : 0.65).cgColor
+        layer?.borderColor = NSColor(
+            srgbRed: isDark ? 0.28 : 0.82,
+            green: isDark ? 0.33 : 0.84,
+            blue: isDark ? 0.40 : 0.87,
+            alpha: 1
+        ).cgColor
         layer?.borderWidth = 1
         layer?.cornerRadius = 9
         layer?.masksToBounds = true
@@ -252,7 +257,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         statusRow.detachesHiddenViews = true
         statusRow.heightAnchor.constraint(equalToConstant: 18).isActive = true
 
-        let hint = label("↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存关闭 · Esc 关闭", size: 12, weight: .medium, color: .secondaryLabelColor)
+        let hint = label("↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存切回 · Esc 关闭", size: 12, weight: .medium, color: .secondaryLabelColor)
         addButton = NSButton(title: "加入 Anki", target: self, action: #selector(addClicked))
         addButton.bezelStyle = .rounded
         addButton.controlSize = .large
@@ -418,6 +423,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func hideWindow() {
         window.orderOut(nil)
+        activatePreviousApplication()
+    }
+
+    private func activatePreviousApplication() {
+        window.resignKey()
+        NSApp.deactivate()
         if let previousApplication, !previousApplication.isTerminated {
             if #available(macOS 14.0, *) {
                 previousApplication.activate(options: [.activateAllWindows])
@@ -640,7 +651,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 }
                 if returnAfterSave {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
-                        self?.hideWindow()
+                        self?.activatePreviousApplication()
                     }
                 } else {
                     focusWord()

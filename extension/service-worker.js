@@ -94,6 +94,15 @@ async function openManualInput() {
     clearTimeout(timeout);
   }
 
+  try {
+    const previousWindow = await chrome.windows.getLastFocused({ windowTypes: ["normal"] });
+    if (previousWindow?.id) {
+      await chrome.storage.session.set({ manualInputReturnWindowId: previousWindow.id });
+    }
+  } catch (_error) {
+    // The fallback popup still works even if Arc cannot report its previous window.
+  }
+
   await chrome.windows.create({
     url: chrome.runtime.getURL("popup.html"),
     type: "popup",

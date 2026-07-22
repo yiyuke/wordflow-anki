@@ -37,6 +37,19 @@ function clientHeaders() {
   };
 }
 
+async function returnToPreviousBrowserWindow() {
+  try {
+    const { manualInputReturnWindowId } = await chrome.storage.session.get("manualInputReturnWindowId");
+    if (Number.isInteger(manualInputReturnWindowId)) {
+      await chrome.windows.update(manualInputReturnWindowId, { focused: true });
+      return;
+    }
+  } catch (_error) {
+    // Losing focus is still preferable to closing the user's input window.
+  }
+  window.blur();
+}
+
 async function loadDecks() {
   const deck = $("#deck");
   try {
@@ -67,7 +80,7 @@ async function saveDeck() {
   if (!response.ok || !data.ok) throw new Error(data.error || "牌组选择未保存");
 }
 
-async function addWord(closeAfterSave = false) {
+async function addWord(returnAfterSave = false) {
   const word = $("#word").value.trim();
   if (!word) return;
   const button = $("#add");
@@ -97,7 +110,7 @@ async function addWord(closeAfterSave = false) {
       $("#word").value = "";
       $("#context").value = "";
     }
-    if (closeAfterSave) window.close();
+    if (returnAfterSave) await returnToPreviousBrowserWindow();
   } catch (error) {
     result.className = "error";
     result.textContent = friendlyMessage(error);
