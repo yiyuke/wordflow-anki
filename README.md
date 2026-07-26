@@ -61,6 +61,12 @@ The browser extension captures words and context. A local service generates the 
 - An [OpenAI API key](https://platform.openai.com/api-keys) — API billing is separate from a ChatGPT subscription
 - Optional: Xcode Command Line Tools for the native Quick Add window; Wordflow falls back to a browser window when Swift is unavailable
 
+### Download, clone, or fork?
+
+Most users should **not fork the repository**. Download a GitHub Release or clone the repository, run `install.command`, configure their own OpenAI API key, install AnkiConnect, and load the extension as described below. Forking is only useful when someone wants an independent copy to modify or contribute from.
+
+An AI coding assistant can follow this README and help with installation, but it is optional. The user still needs to approve macOS prompts, install AnkiConnect, provide their own API key, and load the unpacked extension until a store version is available.
+
 ### Install
 
 #### 1. Download Wordflow
@@ -133,6 +139,8 @@ At runtime, Wordflow does not execute a Codex Skill. The local service sends a W
 
 Wordflow has no account, analytics, advertising, or developer-operated server. The selected text, a bounded amount of nearby context, and the page title are sent directly from your Mac to the OpenAI API to generate the card. The page URL is stored in your local Anki note but is not included in the OpenAI request. Requests use `store: false`.
 
+Each installation uses the API key configured on that person's Mac. Your key is stored in your own macOS Keychain, is ignored by Git, and is never distributed through this public repository. Other users therefore use and pay for their own OpenAI API usage; publishing or forking the code does not give them access to your quota.
+
 See [PRIVACY.md](PRIVACY.md) for the complete bilingual disclosure and extension permission rationale.
 
 ### Update and uninstall
@@ -195,6 +203,12 @@ Arc / Chrome 扩展 ─┐
 - Python 3
 - [OpenAI API Key](https://platform.openai.com/api-keys)；API 费用与 ChatGPT 订阅相互独立
 - 可选：Xcode Command Line Tools，用于构建原生快速窗口；没有 Swift 时会自动使用浏览器备用窗口
+
+### 下载、Clone 还是 Fork？
+
+普通使用者**不需要 Fork 仓库**。最常见的方式是下载 GitHub Release，或者 Clone 仓库，然后运行 `install.command`、配置自己的 OpenAI API Key、安装 AnkiConnect，并按下方说明加载扩展。只有准备独立修改代码或提交贡献的人才需要 Fork。
+
+用户也可以让 AI 编程工具读取这份 README 并协助安装，但这不是必需条件。macOS 权限确认、AnkiConnect 安装、输入自己的 API Key，以及在商店版发布前加载未打包扩展，仍然需要用户本人完成。
 
 ### 安装
 
@@ -267,6 +281,8 @@ Wordflow 运行时并不会执行一个 Codex Skill。本地服务会把 Wordflo
 ### 隐私
 
 Wordflow 没有账号、广告、数据分析或开发者运营的服务器。选中的文字、有限长度的附近上下文和页面标题会从你的 Mac 直接发送到 OpenAI API，用于生成卡片。页面 URL 只写入本地 Anki，不会包含在 OpenAI 请求中。请求设置为 `store: false`。
+
+每一份安装都会使用那台 Mac 上单独配置的 API Key。你的 Key 只保存在自己的 macOS 钥匙串中，会被 Git 忽略，也不会随着公开仓库分发。因此，其他用户使用并支付的是他们自己的 OpenAI API 用量；公开或 Fork 代码不会让他们获得你的 API 额度。
 
 完整的中英双语说明及浏览器权限用途见 [PRIVACY.md](PRIVACY.md)。
 

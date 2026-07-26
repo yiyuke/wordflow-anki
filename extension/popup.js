@@ -50,6 +50,139 @@ function localizePage() {
     element.title = t(element.dataset.i18nTitle, undefined, element.title);
   });
   $("#language").value = languagePreference;
+  refreshSelectDisplay("language");
+  refreshSelectDisplay("deck");
+}
+
+function selectParts(name) {
+  const root = document.querySelector(`[data-select="${name}"]`);
+  return {
+    root,
+    input: $(`#${name}`),
+    trigger: $(`#${name}-trigger`),
+    menu: $(`#${name}-listbox`)
+  };
+}
+
+function refreshSelectDisplay(name) {
+  const { root, input, trigger, menu } = selectParts(name);
+  if (!root || !input || !trigger || !menu) return;
+  const options = [...menu.querySelectorAll(".select-option")];
+  const selected = options.find((option) => option.dataset.value === input.value);
+  trigger.querySelector(".select-value").textContent = selected?.textContent.trim() || input.value;
+  options.forEach((option) => {
+    option.setAttribute("aria-selected", String(option === selected));
+  });
+}
+
+function closeSelect(name, restoreFocus = false) {
+  const { trigger, menu } = selectParts(name);
+  if (!trigger || !menu || menu.hidden) return false;
+  menu.hidden = true;
+  trigger.setAttribute("aria-expanded", "false");
+  if (restoreFocus) trigger.focus();
+  return true;
+}
+
+function closeAllSelects(except = "") {
+  let closed = false;
+  document.querySelectorAll("[data-select]").forEach((root) => {
+    if (root.dataset.select !== except) {
+      closed = closeSelect(root.dataset.select) || closed;
+    }
+  });
+  return closed;
+}
+
+function openSelect(name, focusPosition = "selected") {
+  const { input, trigger, menu } = selectParts(name);
+  if (!input || !trigger || !menu || trigger.disabled) return;
+  closeAllSelects(name);
+  menu.hidden = false;
+  trigger.setAttribute("aria-expanded", "true");
+  const options = [...menu.querySelectorAll(".select-option")];
+  if (!options.length || focusPosition === "none") return;
+  const selectedIndex = options.findIndex((option) => option.dataset.value === input.value);
+  const targetIndex = focusPosition === "last"
+    ? options.length - 1
+    : selectedIndex >= 0
+      ? selectedIndex
+      : 0;
+  options[targetIndex].focus();
+}
+
+function chooseSelectOption(name, value) {
+  const { input } = selectParts(name);
+  if (!input) return;
+  const changed = input.value !== value;
+  input.value = value;
+  refreshSelectDisplay(name);
+  closeSelect(name, true);
+  if (changed) input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function setSelectOptions(name, values, selectedValue) {
+  const { input, trigger, menu } = selectParts(name);
+  if (!input || !trigger || !menu) return;
+  menu.replaceChildren(
+    ...values.map(({ value, label }) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "select-option";
+      option.setAttribute("role", "option");
+      option.dataset.value = value;
+      option.textContent = label;
+      return option;
+    })
+  );
+  input.value = values.some((option) => option.value === selectedValue)
+    ? selectedValue
+    : values[0]?.value || "";
+  trigger.disabled = values.length === 0;
+  refreshSelectDisplay(name);
+}
+
+function setupSelect(name) {
+  const { root, trigger, menu } = selectParts(name);
+  if (!root || !trigger || !menu) return;
+
+  trigger.addEventListener("click", () => {
+    if (menu.hidden) openSelect(name, "none");
+    else closeSelect(name);
+  });
+  trigger.addEventListener("keydown", (event) => {
+    if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) {
+      event.preventDefault();
+      openSelect(name, event.key === "ArrowUp" ? "last" : "selected");
+    }
+  });
+  menu.addEventListener("click", (event) => {
+    const option = event.target.closest(".select-option");
+    if (option) chooseSelectOption(name, option.dataset.value);
+  });
+  menu.addEventListener("keydown", (event) => {
+    const options = [...menu.querySelectorAll(".select-option")];
+    const currentIndex = options.indexOf(document.activeElement);
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowDown") nextIndex = Math.min(currentIndex + 1, options.length - 1);
+    else if (event.key === "ArrowUp") nextIndex = Math.max(currentIndex - 1, 0);
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = options.length - 1;
+    else if (["Enter", " "].includes(event.key) && currentIndex >= 0) {
+      event.preventDefault();
+      chooseSelectOption(name, options[currentIndex].dataset.value);
+      return;
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeSelect(name, true);
+      return;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    options[nextIndex]?.focus();
+  });
 }
 
 function setResult(message, { error = false, clearAfter = 0 } = {}) {
@@ -153,7 +286,6 @@ async function returnToPreviousBrowserWindow() {
 }
 
 async function loadDecks() {
-  const deck = $("#deck");
   try {
     const response = await fetch(`${await getServiceUrl()}/api/decks`, {
       headers: clientHeaders()
@@ -162,9 +294,11 @@ async function loadDecks() {
     if (!response.ok || !data.ok || !Array.isArray(data.decks) || !data.decks.length) {
       throw new Error(data.error || t("decksLoadFailed", undefined, "Could not load Anki decks"));
     }
-    deck.replaceChildren(...data.decks.map((name) => new Option(name, name)));
-    deck.value = data.selected;
-    deck.disabled = false;
+    setSelectOptions(
+      "deck",
+      data.decks.map((name) => ({ value: name, label: name })),
+      data.selected
+    );
   } catch (error) {
     setResult(friendlyMessage(error), { error: true, clearAfter: 10000 });
   }
@@ -221,6 +355,12 @@ async function addWord(returnAfterSave = false) {
   }
 }
 
+setupSelect("language");
+setupSelect("deck");
+document.addEventListener("click", (event) => {
+  if (!event.target.closest("[data-select]")) closeAllSelects();
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
   await loadLanguagePreference();
   await loadMessageCatalog();
@@ -265,8 +405,9 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key.toLowerCase() === "d" && (event.metaKey || event.ctrlKey)) {
     event.preventDefault();
-    $("#deck").focus();
+    $("#deck-trigger").focus();
+    openSelect("deck");
     return;
   }
-  if (event.key === "Escape") window.close();
+  if (event.key === "Escape" && !closeAllSelects()) window.close();
 });

@@ -78,6 +78,20 @@ class WordflowTests(unittest.TestCase):
         self.assertFalse(is_valid_client_header(""))
         self.assertFalse(is_valid_client_header("browser"))
 
+    def test_browser_fallback_uses_accessible_below_trigger_dropdowns(self):
+        extension_dir = SERVICE_DIR.parent / "extension"
+        markup = (extension_dir / "popup.html").read_text(encoding="utf-8")
+        styling = (extension_dir / "popup.css").read_text(encoding="utf-8")
+        script = (extension_dir / "popup.js").read_text(encoding="utf-8")
+        self.assertEqual(markup.count('role="combobox"'), 2)
+        self.assertEqual(markup.count('role="listbox"'), 2)
+        self.assertIn("margin-top: 7px", styling)
+        self.assertNotIn("position: absolute", styling)
+        self.assertIn("input:focus-visible", styling)
+        self.assertNotIn("border-color: #12b76a", styling)
+        self.assertIn('setupSelect("language")', script)
+        self.assertIn('setupSelect("deck")', script)
+
     def test_running_quick_window_is_signalled_instead_of_reopened(self):
         with patch("server.subprocess.run") as process, patch("server.os.kill") as kill:
             process.return_value.stdout = "/installed/Wordflow Quick Add.app/Contents/MacOS/WordflowQuickAdd\n"
