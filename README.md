@@ -4,7 +4,7 @@
 
 <h1 align="center">Wordflow</h1>
 
-<p align="center"><strong>Do not memorize someone else's word list. Remember the words you actually meet.</strong></p>
+<p align="center"><strong>Remember the words you actually encounter.</strong></p>
 <p align="center">Collect → Understand → Review → Use</p>
 
 <p align="center">
@@ -20,30 +20,60 @@
 
 ---
 
-## Anki remembers when you should review. Wordflow creates what you should review.
+## Review with Anki. Capture with Wordflow.
 
-[Anki](https://apps.ankiweb.net/) is a flashcard app built around spaced repetition. It brings a card back just before you are likely to forget it, helping knowledge move into long-term memory.
+[Anki](https://apps.ankiweb.net/) is a spaced-repetition app. It schedules vocabulary cards to return at gradually increasing intervals, helping you remember them for the long term.
 
-Anki is excellent at reviewing—but making a useful vocabulary card is still slow. Wordflow lets you select or type a word, understands it in its original context, creates a compact learning card, and sends it straight to Anki.
+Anki is great for review, but every vocabulary card still has to be entered by hand.
+
+Wordflow lets you select or type a word, understand it in its original context, generate a compact learning card, and send it straight to Anki.
 
 ```text
-Meet a word → Capture it once → Review before it fades → Use it
+Meet a word → Capture it once → Review on a schedule → Use it
 ```
 
-We believe this is the best way to build vocabulary: not by memorizing a list detached from your life, but by keeping the words you genuinely encounter, understanding them in context, and revisiting them at the right time.
+I believe the best way to remember vocabulary is not to memorize an unfamiliar list, but to understand words in the real contexts where you encounter them, revisit them at the right time, and keep going until you can use them.
 
-## Why it feels different
+## Why Wordflow
 
-- **Real context, not an isolated definition.** The sentence and source stay with the word.
-- **An explanation that fits the expression.** A word, idiom, phrasal verb, and abstract concept are handled differently.
-- **Almost no interruption.** Select and right-click, or open Quick Add from any app with `Option + Shift + W`.
-- **Active recall in both directions.** Every note creates recognition and production cards.
+- **Keep the real context, not an isolated definition.** Save the original sentence with the word and build the card around it.
+- **A card tailored to each expression.** AI chooses the most useful content for a word, phrase, idiom, or collocation.
+- **Almost no interruption.** Select and right-click, or press `Option + Shift + W` to open Quick Add.
+- **Active recall in both directions.** Every capture creates both recognition and production cards.
 
 Wordflow adds pronunciation, a clear meaning, 2–3 useful collocations, 1–2 reusable examples, and one short learning note designed for that particular expression.
 
 ## Install
 
 > Wordflow is currently an early macOS release. It requires Anki, AnkiConnect, a Chromium browser, Python 3, and your own OpenAI API key. The browser extension is loaded manually until a Chrome Web Store version is available.
+
+### Recommended: let a local AI coding agent install it
+
+If you use Codex, Claude Code, or another AI coding agent with terminal access to your Mac, copy the entire prompt below. A chat-only AI cannot install local software for you.
+
+```text
+Please install Wordflow on this Mac:
+https://github.com/yiyuke/wordflow-anki
+
+Before making changes, read README.md and install.command so you understand what will be installed.
+Use or update the main branch, run the repository's installer, and verify that:
+1. the local Wordflow service is running on 127.0.0.1:8766;
+2. the native Quick Add window opens;
+3. the browser extension has been copied to the correct installation folder.
+
+Do not ask me to fork the repository, and do not ask me to paste my OpenAI API key into the chat.
+Pause only for steps that I must complete myself, and give me clear step-by-step instructions:
+- install or open Anki and add AnkiConnect (code: 2055492159);
+- paste my own OpenAI API key into the hidden local terminal prompt so it is stored in macOS Keychain;
+- confirm loading the extension in Arc / Chrome or approve a macOS security prompt.
+
+When finished, test Option + Shift + W and tell me whether anything still requires manual action.
+```
+
+> Never paste your API key directly into an AI chat. Wordflow's configuration script accepts it through a hidden local prompt and stores it in macOS Keychain.
+
+<details>
+<summary><strong>Prefer not to use AI? Show the manual installation steps</strong></summary>
 
 ### 1. Download
 
@@ -53,8 +83,6 @@ There is not yet a tagged release. For the current preview:
 git clone https://github.com/yiyuke/wordflow-anki.git
 cd wordflow-anki
 ```
-
-Ordinary users do not need to fork the repository. Fork only if you want to change the code or contribute.
 
 ### 2. Install AnkiConnect
 
@@ -74,6 +102,8 @@ Ordinary users do not need to fork the repository. Fork only if you want to chan
 2. Enable **Developer mode** and choose **Load unpacked**.
 3. Select `~/Library/Application Support/Wordflow/extension`.
 
+</details>
+
 ## Use
 
 | What you want to do | Action |
@@ -89,9 +119,11 @@ Choose `Auto / 中文 / English` in Quick Add to change both the interface and t
 
 ## Privacy and cost
 
-Wordflow has no account, analytics, advertising, or developer-operated server. Your word and limited context go directly from your Mac to the OpenAI API; the finished card stays in your Anki collection.
+Wordflow has no account, analytics, advertising, or developer-operated server.
 
-Every installation uses its own OpenAI API key and pays for its own usage. The key is stored in macOS Keychain and is never included in this repository. See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
+Your word and limited context go directly from your Mac to the OpenAI API; the finished card stays in your Anki collection.
+
+Every installation uses its own OpenAI API key and pays for its own usage. See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
 
 <details>
 <summary><strong>How Wordflow works</strong></summary>
@@ -115,12 +147,11 @@ To update, run `git pull`, run `install.command` again, and reload the extension
 ```bash
 python3 -m unittest discover -s local_service/tests -v
 node --check extension/service-worker.js
-node --check extension/content.js
 node --check extension/popup.js
 native/build-app.sh
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), and the [launch kit](docs/LAUNCH.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), the [launch kit](docs/LAUNCH.md), and the [Chrome Web Store submission kit](docs/CHROME_WEB_STORE.md).
 
 </details>
 

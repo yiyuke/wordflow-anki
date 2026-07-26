@@ -21,7 +21,6 @@ jobs:
       - name: JavaScript syntax
         run: |
           node --check extension/service-worker.js
-          node --check extension/content.js
           node --check extension/popup.js
       - name: Validate metadata
         run: |
@@ -29,5 +28,7 @@ jobs:
           python3 -m json.tool extension/manifest.json >/dev/null
           python3 -m json.tool extension/_locales/en/messages.json >/dev/null
           python3 -m json.tool extension/_locales/zh_CN/messages.json >/dev/null
+      - name: Validate store package
+        run: scripts/validate-store-package.sh
       - name: Build native app
         run: native/build-app.sh /tmp/wordflow-build
