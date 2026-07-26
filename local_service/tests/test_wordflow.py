@@ -90,8 +90,29 @@ class WordflowTests(unittest.TestCase):
         self.assertIn("input:focus-visible", styling)
         self.assertIn("border-color: #067647", styling)
         self.assertIn("0 0 0 2px rgba(6, 118, 71, .14)", styling)
+        self.assertIn("::selection { color: #101828; background: #e8f5ed; }", styling)
+        self.assertIn('select-option[aria-selected="true"] { color: #067647; background: #ecfdf3;', styling)
+        self.assertNotIn("#175cd3", styling)
+        self.assertNotIn("#eff4ff", styling)
         self.assertIn('setupSelect("language")', script)
         self.assertIn('setupSelect("deck")', script)
+
+    def test_native_quick_add_uses_brand_green_without_changing_success_green(self):
+        source = (SERVICE_DIR.parent / "native" / "WordflowQuickAdd.swift").read_text(encoding="utf-8")
+        self.assertIn("addButton.bezelColor = Brand.primary", source)
+        self.assertIn("textView.insertionPointColor = Brand.primary", source)
+        self.assertIn(".backgroundColor: Brand.selectionBackground", source)
+        self.assertIn("pinButton.contentTintColor = pinned ? Brand.primary", source)
+        self.assertIn("pinButton.setButtonType(.momentaryChange)", source)
+        self.assertIn("Brand.primary.withAlphaComponent(isDark ? 0.9 : 0.62)", source)
+        self.assertIn("layer?.borderWidth = 1", source)
+        self.assertIn("color: success ? .systemGreen : .systemRed", source)
+        self.assertNotIn(".controlAccentColor", source)
+        info = (SERVICE_DIR.parent / "native" / "Info.plist").read_text(encoding="utf-8")
+        build_script = (SERVICE_DIR.parent / "native" / "build-app.sh").read_text(encoding="utf-8")
+        self.assertIn("<key>NSAccentColorName</key>", info)
+        self.assertIn("<string>AccentColor</string>", info)
+        self.assertIn("xcrun actool", build_script)
 
     def test_running_quick_window_is_signalled_instead_of_reopened(self):
         with patch("server.subprocess.run") as process, patch("server.os.kill") as kill:

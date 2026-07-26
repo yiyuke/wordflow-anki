@@ -22,5 +22,14 @@ fi
   -o "$CONTENTS/MacOS/WordflowQuickAdd"
 /bin/cp "$ROOT/Info.plist" "$CONTENTS/Info.plist"
 /bin/cp "$ROOT/Wordflow.icns" "$CONTENTS/Resources/Wordflow.icns"
+if [[ -d "$ROOT/Assets.xcassets" ]]; then
+  /usr/bin/xcrun actool "$ROOT/Assets.xcassets" \
+    --compile "$CONTENTS/Resources" \
+    --platform macosx \
+    --minimum-deployment-target 12.0 \
+    --output-format human-readable-text \
+    --warnings \
+    --notices >/dev/null
+fi
 /usr/bin/touch "$APP"
 echo "$APP"

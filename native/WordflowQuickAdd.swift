@@ -21,7 +21,42 @@ private enum Copy {
     }
 }
 
+private enum Brand {
+    static let primary = NSColor(
+        name: NSColor.Name("WordflowPrimary"),
+        dynamicProvider: { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return NSColor(
+                srgbRed: isDark ? 23.0 / 255.0 : 6.0 / 255.0,
+                green: isDark ? 178.0 / 255.0 : 118.0 / 255.0,
+                blue: isDark ? 106.0 / 255.0 : 71.0 / 255.0,
+                alpha: 1
+            )
+        }
+    )
+
+    static let selectionBackground = NSColor(
+        name: NSColor.Name("WordflowSelectionBackground"),
+        dynamicProvider: { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return NSColor(
+                srgbRed: isDark ? 29.0 / 255.0 : 232.0 / 255.0,
+                green: isDark ? 74.0 / 255.0 : 245.0 / 255.0,
+                blue: isDark ? 53.0 / 255.0 : 237.0 / 255.0,
+                alpha: 1
+            )
+        }
+    )
+}
+
 private final class InputSurfaceView: NSView {
+    var isFocused = false {
+        didSet {
+            guard oldValue != isFocused else { return }
+            needsDisplay = true
+        }
+    }
+
     override var wantsUpdateLayer: Bool { true }
 
     override func updateLayer() {
@@ -30,11 +65,15 @@ private final class InputSurfaceView: NSView {
             calibratedWhite: isDark ? 0.16 : 0.96,
             alpha: 1
         ).cgColor
-        layer?.borderColor = NSColor(
-            srgbRed: isDark ? 0.28 : 0.82,
-            green: isDark ? 0.33 : 0.84,
-            blue: isDark ? 0.40 : 0.87,
-            alpha: 1
+        layer?.borderColor = (
+            isFocused
+                ? Brand.primary.withAlphaComponent(isDark ? 0.9 : 0.62)
+                : NSColor(
+                    srgbRed: isDark ? 0.28 : 0.82,
+                    green: isDark ? 0.33 : 0.84,
+                    blue: isDark ? 0.40 : 0.87,
+                    alpha: 1
+                )
         ).cgColor
         layer?.borderWidth = 1
         layer?.cornerRadius = 9
@@ -78,6 +117,19 @@ private final class ContextTextView: NSTextView {
     var focusWordHandler: (() -> Void)?
     var focusNextHandler: (() -> Void)?
     var submitHandler: (() -> Void)?
+    var focusChangedHandler: ((Bool) -> Void)?
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { focusChangedHandler?(true) }
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let accepted = super.resignFirstResponder()
+        if accepted { focusChangedHandler?(false) }
+        return accepted
+    }
 
     override func keyDown(with event: NSEvent) {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -108,6 +160,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var window: QuickAddWindow!
     private var wordField: NSTextField!
     private var contextView: ContextTextView!
+    private var wordSurface: InputSurfaceView!
+    private var contextSurface: InputSurfaceView!
     private var deckButton: NSPopUpButton!
     private var addButton: NSButton!
     private var pinButton: NSButton!
@@ -182,7 +236,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         window.contentView = content
 
         titleLabel = label(Copy.text("快速添加到 Anki", "Quick Add to Anki"), size: 21, weight: .bold, color: .labelColor)
-        subtitleLabel = label(Copy.text("打开窗口：⌥⇧W", "Open window: ⌥⇧W"), size: 13, weight: .semibold, color: .controlAccentColor)
+        subtitleLabel = label(Copy.text("打开窗口：⌥⇧W", "Open window: ⌥⇧W"), size: 13, weight: .semibold, color: Brand.primary)
         let titleStack = NSStackView(views: [titleLabel, subtitleLabel])
         titleStack.orientation = .vertical
         titleStack.alignment = .leading
@@ -193,7 +247,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             target: self,
             action: #selector(pinClicked)
         )
-        pinButton.setButtonType(.toggle)
+        pinButton.setButtonType(.momentaryChange)
         pinButton.isBordered = false
         pinButton.focusRingType = .none
         pinButton.imagePosition = .imageOnly
@@ -255,7 +309,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         wordField.setAccessibilityIdentifier("wordField")
         wordField.translatesAutoresizingMaskIntoConstraints = false
 
-        let wordSurface = InputSurfaceView()
+        wordSurface = InputSurfaceView()
         wordSurface.translatesAutoresizingMaskIntoConstraints = false
         wordSurface.addSubview(wordField)
         NSLayoutConstraint.activate([
@@ -277,16 +331,21 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         contextView.focusWordHandler = { [weak self] in self?.focusWord() }
         contextView.focusNextHandler = { [weak self] in self?.focusAddButton() }
         contextView.submitHandler = { [weak self] in self?.submit(returnAfterSave: true) }
+        contextView.focusChangedHandler = { [weak self] focused in
+            self?.contextSurface.isFocused = focused
+        }
+        applyTextBranding(to: contextView)
 
         let contextScroll = NSScrollView()
         contextScroll.borderType = .noBorder
+        contextScroll.focusRingType = .none
         contextScroll.drawsBackground = false
         contextScroll.hasVerticalScroller = true
         contextScroll.autohidesScrollers = true
         contextScroll.documentView = contextView
         contextScroll.translatesAutoresizingMaskIntoConstraints = false
 
-        let contextSurface = InputSurfaceView()
+        contextSurface = InputSurfaceView()
         contextSurface.translatesAutoresizingMaskIntoConstraints = false
         contextSurface.addSubview(contextScroll)
         NSLayoutConstraint.activate([
@@ -320,8 +379,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         ), size: 12, weight: .medium, color: .secondaryLabelColor)
         addButton = NSButton(title: Copy.text("加入 Anki", "Add to Anki"), target: self, action: #selector(addClicked))
         addButton.bezelStyle = .rounded
+        addButton.bezelColor = Brand.primary
         addButton.controlSize = .large
         addButton.font = .systemFont(ofSize: 14, weight: .semibold)
+        addButton.focusRingType = .none
         addButton.keyEquivalent = "\r"
         addButton.keyEquivalentModifierMask = [.command]
         addButton.setAccessibilityIdentifier("addButton")
@@ -546,14 +607,31 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func focusWord() {
         window.makeFirstResponder(wordField)
+        wordSurface.isFocused = true
+        contextSurface.isFocused = false
+        if let editor = wordField.currentEditor() as? NSTextView {
+            applyTextBranding(to: editor)
+        }
     }
 
     private func focusContext() {
         window.makeFirstResponder(contextView)
+        wordSurface.isFocused = false
+        contextSurface.isFocused = true
     }
 
     private func focusAddButton() {
         window.makeFirstResponder(addButton)
+        wordSurface.isFocused = false
+        contextSurface.isFocused = false
+    }
+
+    private func applyTextBranding(to textView: NSTextView) {
+        textView.insertionPointColor = Brand.primary
+        textView.selectedTextAttributes = [
+            .backgroundColor: Brand.selectionBackground,
+            .foregroundColor: NSColor.labelColor,
+        ]
     }
 
     private func selectAllInFocusedInput() -> Bool {
@@ -784,13 +862,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         return false
     }
 
+    func controlTextDidBeginEditing(_ notification: Notification) {
+        guard notification.object as? NSTextField === wordField else { return }
+        wordSurface.isFocused = true
+        contextSurface.isFocused = false
+        if let editor = wordField.currentEditor() as? NSTextView {
+            applyTextBranding(to: editor)
+        }
+    }
+
+    func controlTextDidEndEditing(_ notification: Notification) {
+        guard notification.object as? NSTextField === wordField else { return }
+        wordSurface.isFocused = false
+    }
+
     @objc private func addClicked() {
         let modifiers = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
         submit(returnAfterSave: modifiers.contains(.command))
     }
 
     @objc private func pinClicked() {
-        applyPin(pinButton.state == .on)
+        togglePin()
     }
 
     private func togglePin() {
@@ -809,14 +901,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             systemSymbolName: symbol,
             accessibilityDescription: description
         )?.withSymbolConfiguration(configuration)
-        pinButton.contentTintColor = pinned ? .controlAccentColor : .secondaryLabelColor
+        pinButton.contentTintColor = pinned ? Brand.primary : .secondaryLabelColor
         pinButton.setAccessibilityValue(description)
     }
 
     private func applyPin(_ pinned: Bool) {
         window.level = pinned ? .floating : .normal
         window.collectionBehavior = pinned ? [.canJoinAllSpaces, .fullScreenAuxiliary] : []
-        pinButton.state = pinned ? .on : .off
+        pinButton.state = .off
         updatePinAppearance()
         defaults.set(pinned, forKey: "windowPinned")
     }

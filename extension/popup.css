@@ -4,6 +4,7 @@
   color: #1d2939;
   background: #f8fafc;
 }
+::selection { color: #101828; background: #e8f5ed; }
 
 body { margin: 0; min-width: 380px; background: #f8fafc; }
 main { box-sizing: border-box; max-width: 520px; margin: 0 auto; padding: 38px 22px 28px; }
@@ -108,7 +109,7 @@ input::placeholder, textarea::placeholder { color: #98a2b3; opacity: 1; }
 }
 .select-option:hover,
 .select-option:focus-visible { outline: none; background: #f2f4f7; }
-.select-option[aria-selected="true"] { color: #175cd3; background: #eff4ff; font-weight: 700; }
+.select-option[aria-selected="true"] { color: #067647; background: #ecfdf3; font-weight: 700; }
 
 #add {
   width: 100%; margin-top: 14px; border: 0; border-radius: 9px; padding: 10px 12px;
@@ -139,7 +140,8 @@ input::placeholder, textarea::placeholder { color: #98a2b3; opacity: 1; }
   .select-option { color: #f8fafc; }
   .select-option:hover,
   .select-option:focus-visible { background: #344054; }
-  .select-option[aria-selected="true"] { color: #b2ccff; background: #253b63; }
+  .select-option[aria-selected="true"] { color: #6ce9a6; background: #14532d; }
+  ::selection { color: #f8fafc; background: #1d4a35; }
   #result.error { color: #fda29b; }
   .hint { color: #d0d5dd; }
 }

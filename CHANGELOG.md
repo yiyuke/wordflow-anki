@@ -6,8 +6,10 @@ All notable changes to Wordflow are documented here.
 
 - Increased the top breathing room on the browser fallback page.
 - Replaced native language and deck selectors with accessible keyboard-friendly comboboxes whose menus open below their triggers without moving the form.
-- Uses a narrow, deep-green focus state consistent with the primary action in light and dark modes.
-- Clarified in the bilingual README that ordinary users download or clone Wordflow, while each installation supplies and pays for its own OpenAI API key.
+- Uses a restrained green focus state consistent with the primary action in light and dark modes.
+- Unified the native Quick Add button, caret, focus border, selected text, shortcut label, Pin, and native menu accent around the Wordflow green palette while keeping success feedback brighter.
+- Softened the text-selection wash and native focus border so the green state remains visible without competing with the content.
+- Shortened the bilingual README around one clear idea: Anki schedules the review, and Wordflow creates the right material to review.
 
 ## 0.7.0 — 2026-07-26
 
