@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an improvement to the vocabulary workflow
+title: "[Idea] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What learning problem would this solve?
+      description: Start with the moment in the collect → understand → review → use workflow that feels difficult.
+      placeholder: When I am…, I cannot easily…
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: What would the ideal workflow feel like?
+      description: Describe the result rather than only a proposed button or setting.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today?
+      description: Include workarounds or other tools you have tried.
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Which stage is affected?
+      options:
+        - Collect
+        - Understand and record
+        - Review
+        - Use
+        - Installation or setup
+        - More than one stage
+    validations:
+      required: true

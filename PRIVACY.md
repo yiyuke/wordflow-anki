@@ -34,7 +34,7 @@ The source URL is saved to your local Anki note but is not sent in the OpenAI ge
 
 Wordflow does not sell personal data. The project author does not receive the captured words, API key, browsing history, or Anki collection.
 
-Questions or security reports can be opened through [GitHub Issues](https://github.com/yiyuke/wordflow-anki/issues).
+General questions can be opened through [GitHub Issues](https://github.com/yiyuke/wordflow-anki/issues). Report sensitive security problems privately according to [SECURITY.md](SECURITY.md).
 
 ## 中文
 
@@ -68,4 +68,4 @@ Wordflow 是浏览器、OpenAI API 与 Anki 之间的本地开源桥梁。它没
 
 Wordflow 不出售个人数据。项目作者不会收到你捕捉的单词、API Key、浏览历史或 Anki 数据库。
 
-隐私或安全问题可以通过 [GitHub Issues](https://github.com/yiyuke/wordflow-anki/issues) 提交。
+一般问题可以通过 [GitHub Issues](https://github.com/yiyuke/wordflow-anki/issues) 提交。涉及敏感信息的安全问题，请按照 [SECURITY.md](SECURITY.md) 私下报告。

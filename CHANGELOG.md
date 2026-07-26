@@ -5,8 +5,8 @@ All notable changes to Wordflow are documented here.
 ## 0.7.1 — 2026-07-26
 
 - Increased the top breathing room on the browser fallback page.
-- Replaced native language and deck selectors with accessible keyboard-friendly comboboxes that expand below their triggers and push later content down.
-- Replaced the green input focus ring with a quieter blue-gray focus state in light and dark modes.
+- Replaced native language and deck selectors with accessible keyboard-friendly comboboxes whose menus open below their triggers without moving the form.
+- Uses a narrow, deep-green focus state consistent with the primary action in light and dark modes.
 - Clarified in the bilingual README that ordinary users download or clone Wordflow, while each installation supplies and pays for its own OpenAI API key.
 
 ## 0.7.0 — 2026-07-26

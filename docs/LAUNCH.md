@@ -6,7 +6,7 @@ Everything here is ready to copy, adjust, and publish. Keep the launch personal 
 
 1. Merge the public-release pull request into `main`.
 2. Run the tests on `main` and install that exact revision locally.
-3. Create GitHub Release `v0.7.0` with the release notes below. GitHub automatically adds source `.zip` and `.tar.gz` downloads.
+3. Create GitHub Release `v0.7.1` with the release notes below. Attach the packaged extension ZIP in addition to GitHub's automatic source archives.
 4. Record one silent 8–15 second demo: select a word → use the shortcut → show the resulting Anki card.
 5. Publish on X/Twitter first, then publish a more personal Chinese version on Xiaohongshu.
 6. Ask for a very specific response: installation problems, one missing card field, or one workflow that still feels slow.
@@ -14,11 +14,13 @@ Everything here is ready to copy, adjust, and publish. Keep the launch personal 
 
 ## 2. GitHub Release
 
-**Tag:** `v0.7.0`
-**Title:** `Wordflow 0.7 — Understand a word, then remember it`
+**Tag:** `v0.7.1`
+**Title:** `Wordflow 0.7 — Catch a word before it slips away`
 
 ```markdown
-Wordflow turns words you meet in Arc, Chrome, PDFs, Word, and podcast notes into review-ready Anki cards.
+Vocabulary books can feel detached from real life. Words found in novels, videos, articles, and podcasts feel meaningful, but often disappear before they become something reviewable. Anki can schedule the review, yet making every note by hand is slow and inconsistent.
+
+Wordflow closes that gap: it turns words you meet in Arc, Chrome, PDFs, Word, and podcast notes into review-ready Anki cards.
 
 Highlights:
 - English and Simplified Chinese UI
@@ -39,9 +41,11 @@ Start with the bilingual README. Please open an Issue if installation is unclear
 Use `assets/social-card-en.png` and, ideally, attach the short demo as the first media item.
 
 ```text
-I built Wordflow to remove one tiny interruption from learning English:
+Vocabulary books often do not stick. Words found in novels, videos, or podcasts can slip away. Anki schedules reviews well, but making each card by hand is slow.
 
-See a word → select it → get a review-ready Anki card.
+I built Wordflow to connect the whole path:
+
+Collect → understand → review → use.
 
 It keeps the original context and adds IPA, a clear meaning, a compact explanation that adapts to each expression, useful collocations, and reusable examples—then creates recognition + production cards.
 
@@ -73,11 +77,15 @@ This is an early open-source release. It still requires AnkiConnect and your own
 **正文：**
 
 ```text
-我学英语时一直有一个很小、但很烦的中断：
+积累词汇时，我一直卡在三个地方：
 
-看到生词 → 复制 → 打开 GPT → 查释义、词源、搭配和例句 → 再粘贴进 Anki。
+背单词书，词和真实语境离得太远，很容易背过就忘。
+在小说、视频、文章或播客里遇见的词更鲜活，却常常还没来得及记录就“滑走”了。
+Anki 很擅长安排复习，但每个词都要手动录入，而且不同词真正需要的解释、搭配和例句并不一样。
 
-步骤并不难，但一天重复很多次以后，我经常干脆不记了。
+所以我做了 Wordflow，想把这条路径连起来：
+
+收集 → 理解与记录 → 复习 → 使用。
 
 所以我做了 Wordflow：
 
