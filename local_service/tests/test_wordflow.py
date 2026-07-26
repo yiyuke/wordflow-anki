@@ -23,8 +23,9 @@ from wordflow import (  # noqa: E402
     WordflowApp,
     _request_json,
     extract_response_text,
+    html_examples,
+    html_inline_items,
     html_items,
-    html_word_insight,
     identity_tag,
     keychain_secret,
     normalize_card,
@@ -147,20 +148,22 @@ class WordflowTests(unittest.TestCase):
     def test_html_is_escaped(self):
         self.assertEqual(html_items(["a < b"]), "<ul><li>a &lt; b</li></ul>")
 
-    def test_word_insight_is_structured_localized_and_escaped(self):
-        insight = html_word_insight(
-            {
-                "original_image": "light < fog",
-                "memory_hook": "light + order = clarity",
-                "semantic_insight": "A precise boundary.",
-                "epiphany": "See clearly.",
-            },
-            "zh",
-        )
-        self.assertIn("原始画面", insight)
-        self.assertIn("核心意象", insight)
-        self.assertIn("light &lt; fog", insight)
-        self.assertNotIn("light < fog", insight)
+    def test_compact_card_items_are_escaped_without_section_labels(self):
+        collocations = html_inline_items(["light < fog", "lucid explanation"])
+        examples = html_examples(["Her answer was <lucid>."])
+        self.assertIn("class='collocation'", collocations)
+        self.assertIn("light &lt; fog", collocations)
+        self.assertIn("class='example'", examples)
+        self.assertIn("&lt;lucid&gt;", examples)
+        self.assertNotIn("<ul>", collocations)
+
+    def test_compact_template_has_one_learning_flow(self):
+        recognition_back = CARD_TEMPLATES[0]["Back"]
+        self.assertIn("wordflow-managed:3", recognition_back)
+        self.assertIn("class='learning-note'", recognition_back)
+        self.assertNotIn("Word insight", recognition_back)
+        self.assertNotIn("{{Etymology}}", recognition_back)
+        self.assertNotIn("class='label'", recognition_back)
 
     def test_identity_uses_lemma_and_part_of_speech(self):
         noun = identity_tag({"lemma": "record", "part_of_speech": "noun"})
@@ -286,6 +289,50 @@ class WordflowTests(unittest.TestCase):
         client._sync_managed_model()
         self.assertEqual(calls, ["modelTemplates"])
 
+    def test_new_cards_store_one_compact_learning_note(self):
+        client = AnkiClient(replace(mock_config(), mock_anki=False))
+        client.ensure_model = lambda _deck=None: None
+        added = {}
+
+        def invoke(action, **params):
+            if action == "findNotes":
+                return []
+            if action == "addNote":
+                added.update(params["note"])
+                return 123
+            raise AssertionError(action)
+
+        client.invoke = invoke
+        result = client.add_card(
+            {
+                "word": "incubate",
+                "lemma": "incubate",
+                "pronunciation": "/ˈɪŋkjəbeɪt/",
+                "part_of_speech": "verb",
+                "meaning_zh": "培育",
+                "definition_en": "to help something develop",
+                "context": "They incubate ideas.",
+                "context_cloze": "They […] ideas.",
+                "collocations": ["incubate an idea", "incubate a startup"],
+                "learning_note": "让想法像蛋一样，在支持和时间中逐渐成熟。",
+                "examples": ["The lab incubates new ideas."],
+                "tags": ["verb"],
+            },
+            {
+                "source_type": "test",
+                "source_title": "Test",
+                "source_url": "",
+                "language": "zh",
+            },
+            deck_name="Test Deck",
+        )
+        self.assertEqual(result["note_id"], 123)
+        self.assertEqual(added["fields"]["Etymology"], "")
+        self.assertEqual(added["fields"]["MemoryHook"], "让想法像蛋一样，在支持和时间中逐渐成熟。")
+        self.assertIn("class='collocation'", added["fields"]["Collocations"])
+        self.assertIn("class='example'", added["fields"]["Examples"])
+        self.assertNotIn("insight-item", added["fields"]["MemoryHook"])
+
     def test_generation_uses_latency_reasoning_setting(self):
         capture = normalize_capture({"text": "lucid", "context": "A lucid explanation.", "language": "en"})
         card = {
@@ -298,12 +345,8 @@ class WordflowTests(unittest.TestCase):
             "context": capture["context"],
             "context_cloze": "A […] explanation.",
             "collocations": ["lucid explanation", "lucid account"],
-            "etymology": "from Latin lucidus",
-            "original_image": "Light passing through a clear surface.",
-            "memory_hook": "Think of light making an idea clear.",
-            "semantic_insight": "Lucid makes an idea easy to see mentally, not merely simple.",
-            "epiphany": "Clarity is light reaching the mind.",
-            "examples": ["Her answer was lucid.", "He gave a lucid account."],
+            "learning_note": "From Latin lux, light: a lucid idea feels mentally illuminated rather than merely simple.",
+            "examples": ["Her answer was lucid."],
             "tags": ["adjective"],
         }
         response = {
@@ -319,12 +362,38 @@ class WordflowTests(unittest.TestCase):
             OpenAICardGenerator(config).generate(capture)
         payload = request_json.call_args.args[1]
         self.assertEqual(payload["reasoning"], {"effort": "none"})
-        self.assertEqual(payload["max_output_tokens"], 1600)
+        self.assertEqual(payload["max_output_tokens"], 1100)
         self.assertIn("explanation language is English", payload["input"][0]["content"])
-        self.assertIn("original_image", payload["text"]["format"]["schema"]["required"])
-        self.assertIn("semantic_insight", payload["text"]["format"]["schema"]["required"])
+        self.assertIn("learning_note", payload["text"]["format"]["schema"]["required"])
+        self.assertNotIn("original_image", payload["text"]["format"]["schema"]["required"])
+        self.assertEqual(payload["text"]["format"]["schema"]["properties"]["collocations"]["minItems"], 2)
+        self.assertEqual(payload["text"]["format"]["schema"]["properties"]["collocations"]["maxItems"], 3)
+        self.assertEqual(payload["text"]["format"]["schema"]["properties"]["examples"]["minItems"], 1)
+        self.assertEqual(payload["text"]["format"]["schema"]["properties"]["examples"]["maxItems"], 2)
+        self.assertIn("Adapt learning_note", payload["input"][0]["content"])
         user_input = json.loads(payload["input"][1]["content"])
         self.assertEqual(user_input["explanation_language"], "en")
+
+    def test_normalization_caps_repetition_and_content_counts(self):
+        capture = normalize_capture(
+            {"text": "lucid", "context": "Her explanation was lucid.", "language": "en"}
+        )
+        card = normalize_card(
+            {
+                "lemma": "lucid",
+                "collocations": ["lucid prose", "Lucid prose", "lucid dream", "lucid account"],
+                "examples": [
+                    "Her explanation was lucid.",
+                    "His answer was lucid.",
+                    "She gave a lucid account.",
+                ],
+                "tags": ["clear", "clear", "adjective"],
+            },
+            capture,
+        )
+        self.assertEqual(card["collocations"], ["lucid prose", "lucid dream", "lucid account"])
+        self.assertEqual(card["examples"], ["His answer was lucid.", "She gave a lucid account."])
+        self.assertEqual(card["tags"], ["clear", "adjective"])
 
     def test_remote_disconnect_is_retried_and_names_the_service(self):
         with (

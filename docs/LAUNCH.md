@@ -6,7 +6,7 @@ Everything here is ready to copy, adjust, and publish. Keep the launch personal 
 
 1. Merge the public-release pull request into `main`.
 2. Run the tests on `main` and install that exact revision locally.
-3. Create GitHub Release `v0.6.0` with the release notes below. GitHub automatically adds source `.zip` and `.tar.gz` downloads.
+3. Create GitHub Release `v0.7.0` with the release notes below. GitHub automatically adds source `.zip` and `.tar.gz` downloads.
 4. Record one silent 8–15 second demo: select a word → use the shortcut → show the resulting Anki card.
 5. Publish on X/Twitter first, then publish a more personal Chinese version on Xiaohongshu.
 6. Ask for a very specific response: installation problems, one missing card field, or one workflow that still feels slow.
@@ -14,8 +14,8 @@ Everything here is ready to copy, adjust, and publish. Keep the launch personal 
 
 ## 2. GitHub Release
 
-**Tag:** `v0.6.0`
-**Title:** `Wordflow 0.6 — Turn every new word into a review`
+**Tag:** `v0.7.0`
+**Title:** `Wordflow 0.7 — Understand a word, then remember it`
 
 ```markdown
 Wordflow turns words you meet in Arc, Chrome, PDFs, Word, and podcast notes into review-ready Anki cards.
@@ -23,7 +23,7 @@ Wordflow turns words you meet in Arc, Chrome, PDFs, Word, and podcast notes into
 Highlights:
 - English and Simplified Chinese UI
 - English or Chinese card explanations
-- Context-aware meaning, IPA, collocations, etymology, memory hook, and examples
+- Context-aware meaning, IPA, an adaptive compact explanation, 2–3 collocations, and 1–2 reusable examples
 - Recognition + production cards
 - Native pinned, keyboard-first Quick Add window for macOS
 - Deck selection and automatic Anki launch
@@ -43,7 +43,7 @@ I built Wordflow to remove one tiny interruption from learning English:
 
 See a word → select it → get a review-ready Anki card.
 
-It keeps the original context and adds IPA, a clear meaning, collocations, careful etymology, memory hooks, and examples—then creates recognition + production cards.
+It keeps the original context and adds IPA, a clear meaning, a compact explanation that adapts to each expression, useful collocations, and reusable examples—then creates recognition + production cards.
 
 Open source. macOS. Arc/Chrome. English + 中文.
 
@@ -81,7 +81,7 @@ This is an early open-source release. It still requires AnkiConnect and your own
 
 所以我做了 Wordflow：
 
-在 Arc / Chrome 里选中单词，右键或按快捷键，它会保留原句和来源，自动整理 IPA、释义、英文定义、搭配、可靠词源、记忆提示和例句，然后直接放进指定的 Anki 牌组，同时生成“看词识义”和“看义回忆”两张卡。
+在 Arc / Chrome 里选中单词，右键或按快捷键，它会保留原句和来源，自动整理 IPA、释义、英文定义、一段根据词语类型动态取舍的紧凑说明、2–3 个搭配和 1–2 个易复用例句，然后直接放进指定的 Anki 牌组，同时生成“看词识义”和“看义回忆”两张卡。
 
 遇到 Word、PDF、播客笔记，或者没法选中的链接，也可以按 ⌥⇧W 打开一个很小的置顶输入框，全程可以用键盘完成。
 

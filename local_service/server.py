@@ -94,7 +94,7 @@ def open_quick_add_window() -> Dict[str, Any]:
 
 class Handler(BaseHTTPRequestHandler):
     app: WordflowApp
-    server_version = "Wordflow/0.6.2"
+    server_version = "Wordflow/0.7.0"
 
     def _headers(self, status: int = 200) -> None:
         origin = self.headers.get("Origin", "").strip()

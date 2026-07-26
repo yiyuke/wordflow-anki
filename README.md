@@ -24,7 +24,7 @@
 
 Wordflow removes the friction between encountering an English word and actually remembering it.
 
-Select a word in Arc or Chrome—or type one from Word, a PDF, a podcast, or anywhere else. Wordflow uses the surrounding context to create a rich Anki note with pronunciation, a learner-friendly meaning, definition, collocations, careful etymology, a memory hook, and natural examples. It then adds both recognition and production cards to your chosen deck.
+Select a word in Arc or Chrome—or type one from Word, a PDF, a podcast, or anywhere else. Wordflow uses the surrounding context to create a compact Anki note with pronunciation, a learner-friendly meaning, an adaptive learning note, useful collocations, and natural examples. It then adds both recognition and production cards to your chosen deck.
 
 ```text
 See a word → Capture once → Review in Anki
@@ -119,16 +119,15 @@ New cards default to `Vocabulary Inbox`. Wordflow remembers later deck choices. 
 - Concise meaning in English or Simplified Chinese
 - Learner-friendly English definition
 - Original context and a cloze version
-- Useful collocations
-- Conservative factual etymology, kept separate from learning imagery
-- A structured word insight: original image, core image, semantic explanation, and a memorable one-line summary
-- Two natural examples
+- 2–3 useful collocations
+- One compact learning note whose strategy adapts to the expression: imagery, semantic transfer, reliable etymology, usage contrast, register, grammar, or phrase logic
+- 1–2 natural, reusable examples
 - Source title and URL
 - Optional OpenAI TTS audio
 
 Duplicate detection uses the lemma and part of speech. Each note creates a **Recognition** card and a **Production** card.
 
-The Word Insight structure is inspired by Li Jigang's [`ljg-word` Skill](https://github.com/lijigang/ljg-skills/blob/master/skills/ljg-word/SKILL.md), adapted for concise Anki review and stricter separation between factual etymology and memory aids.
+At runtime, Wordflow does not execute a Codex Skill. The local service sends a Wordflow-owned generation prompt, the selected text, and its context to the OpenAI Responses API. A strict JSON Schema fixes the card shape and item counts; the model chooses the most useful explanation strategy within that budget. Li Jigang's [`ljg-word` Skill](https://github.com/lijigang/ljg-skills/blob/master/skills/ljg-word/SKILL.md) inspired the optional image-to-meaning technique, but it is one strategy rather than a runtime dependency or a required template.
 
 ### Privacy
 
@@ -160,7 +159,7 @@ Contributions and bug reports are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md
 
 Wordflow 解决的是一个很小、但每天都会打断学习的问题：**看到生词以后，怎样马上把它变成真正会复习的内容？**
 
-你可以在 Arc 或 Chrome 里选中单词，也可以从 Word、PDF、播客笔记或其他软件手动输入。Wordflow 会结合原句生成发音、释义、英文定义、搭配、可靠词源、记忆提示和自然例句，然后把它直接加入你选择的 Anki 牌组，并生成识别与回忆两张卡。
+你可以在 Arc 或 Chrome 里选中单词，也可以从 Word、PDF、播客笔记或其他软件手动输入。Wordflow 会结合原句生成发音、释义、英文定义、一段动态取舍的学习说明、常用搭配和自然例句，然后把它直接加入你选择的 Anki 牌组，并生成识别与回忆两张卡。
 
 ```text
 遇见生词 → 捕捉一次 → 回到 Anki 复习
@@ -255,16 +254,15 @@ Arc 可以直接使用 Chrome Web Store 扩展，因此未来只需发布一个�
 - 中文或英文简明释义
 - 适合学习者的英文定义
 - 原始上下文与挖空版本
-- 常用搭配
-- 谨慎处理的真实词源，并与帮助记忆的意象严格分开
-- 结构化的词语洞察：原始画面、核心意象、语义解释和“一语道破”
-- 两个自然例句
+- 2–3 个常用搭配
+- 一段根据词语类型动态取舍的紧凑说明，可选择画面、语义迁移、可靠词源、近义辨析、语气、语法或短语逻辑
+- 1–2 个自然、容易复用的例句
 - 来源标题与 URL
 - 可选 OpenAI TTS 发音音频
 
 查重使用 lemma + 词性。每条 Note 会生成 **Recognition** 和 **Production** 两张卡。
 
-“词语洞察”的结构受李继刚 [`ljg-word` Skill](https://github.com/lijigang/ljg-skills/blob/master/skills/ljg-word/SKILL.md) 启发，并针对简短的 Anki 复习做了调整，同时严格区分真实词源与帮助记忆的意象。
+Wordflow 运行时并不会执行一个 Codex Skill。本地服务会把 Wordflow 自己维护的生成提示词、选中的词语和上下文发送给 OpenAI Responses API；严格的 JSON Schema 固定字段和数量，模型则在这个信息预算内自行选择最有帮助的解释方法。李继刚的 [`ljg-word` Skill](https://github.com/lijigang/ljg-skills/blob/master/skills/ljg-word/SKILL.md) 提供了“画面 → 含义迁移”的启发，但它只是可选策略之一，不是运行依赖，也不是每个词都必须套用的模板。
 
 ### 隐私
 

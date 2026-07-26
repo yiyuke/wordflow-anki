@@ -2,6 +2,14 @@
 
 All notable changes to Wordflow are documented here.
 
+## 0.7.0 — 2026-07-26
+
+- Replaced the fixed multi-section Word Insight report with one adaptive, compact learning note.
+- Lets the model choose the most useful explanation strategy for each word or phrase, including imagery, semantic transfer, reliable etymology, usage contrast, register, grammar, or phrase logic.
+- Constrains each card to 2–3 useful collocations and 1–2 easy, reusable examples.
+- Presents meaning, explanation, examples, and collocations as one continuous reading flow without labeled boxes.
+- Keeps the existing Anki note fields for a safe, automatic template upgrade.
+
 ## 0.6.2 — 2026-07-26
 
 - Added a structured Word Insight section: original image, core image, semantic explanation, and a memorable one-line summary.
