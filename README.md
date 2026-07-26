@@ -110,7 +110,7 @@ Arc can install Chrome Web Store extensions directly, so a future store release 
 - Press `Command + Enter` to save, leave the pinned card visible, and return focus to the previous app.
 - Press `Command + P` to pin or unpin the window; press `Esc` to close it.
 
-New cards default to `Vocabulary Inbox`. Wordflow remembers later deck choices. If a shortcut conflicts with another extension, change it at `arc://extensions/shortcuts` or `chrome://extensions/shortcuts` and set the manual input shortcut to **Global**.
+New cards default to `Vocabulary Inbox`. Wordflow remembers later deck choices. A deck named `Default` is Anki's real built-in deck, not a special “use the last deck” option. If a shortcut conflicts with another extension, change it at `arc://extensions/shortcuts` or `chrome://extensions/shortcuts` and set the manual input shortcut to **Global**.
 
 ### What goes into a card
 
@@ -120,12 +120,15 @@ New cards default to `Vocabulary Inbox`. Wordflow remembers later deck choices. 
 - Learner-friendly English definition
 - Original context and a cloze version
 - Useful collocations
-- Conservative etymology and a separate memory hook
+- Conservative factual etymology, kept separate from learning imagery
+- A structured word insight: original image, core image, semantic explanation, and a memorable one-line summary
 - Two natural examples
 - Source title and URL
 - Optional OpenAI TTS audio
 
 Duplicate detection uses the lemma and part of speech. Each note creates a **Recognition** card and a **Production** card.
+
+The Word Insight structure is inspired by Li Jigang's [`ljg-word` Skill](https://github.com/lijigang/ljg-skills/blob/master/skills/ljg-word/SKILL.md), adapted for concise Anki review and stricter separation between factual etymology and memory aids.
 
 ### Privacy
 
@@ -243,7 +246,7 @@ Arc 可以直接使用 Chrome Web Store 扩展，因此未来只需发布一个�
 - `Command + Enter`：保存后把焦点交回之前的 App；置顶窗口继续显示。
 - `Command + P`：切换置顶；`Esc`：关闭窗口。
 
-新卡默认加入 `Vocabulary Inbox`。之后选择的牌组会被记住。如果快捷键冲突，可在 `arc://extensions/shortcuts` 或 `chrome://extensions/shortcuts` 修改，并把手动输入快捷键设成 **Global**。
+新卡默认加入 `Vocabulary Inbox`，之后选择的牌组会被记住。列表里的 `Default` 是 Anki 自带的真实牌组，并不是“使用上一次牌组”的特殊选项。如果快捷键冲突，可在 `arc://extensions/shortcuts` 或 `chrome://extensions/shortcuts` 修改，并把手动输入快捷键设成 **Global**。
 
 ### 每张卡包含什么
 
@@ -253,12 +256,15 @@ Arc 可以直接使用 Chrome Web Store 扩展，因此未来只需发布一个�
 - 适合学习者的英文定义
 - 原始上下文与挖空版本
 - 常用搭配
-- 谨慎处理的词源和独立的记忆提示
+- 谨慎处理的真实词源，并与帮助记忆的意象严格分开
+- 结构化的词语洞察：原始画面、核心意象、语义解释和“一语道破”
 - 两个自然例句
 - 来源标题与 URL
 - 可选 OpenAI TTS 发音音频
 
 查重使用 lemma + 词性。每条 Note 会生成 **Recognition** 和 **Production** 两张卡。
+
+“词语洞察”的结构受李继刚 [`ljg-word` Skill](https://github.com/lijigang/ljg-skills/blob/master/skills/ljg-word/SKILL.md) 启发，并针对简短的 Anki 复习做了调整，同时严格区分真实词源与帮助记忆的意象。
 
 ### 隐私
 

@@ -188,11 +188,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         titleStack.alignment = .leading
         titleStack.spacing = 3
 
-        pinButton = NSButton(checkboxWithTitle: Copy.text("置顶", "Pin"), target: self, action: #selector(pinClicked))
-        pinButton.font = .systemFont(ofSize: 13, weight: .medium)
-        pinButton.contentTintColor = .labelColor
-        pinButton.toolTip = Copy.text("始终显示在其他窗口上方（⌘P）", "Keep above other windows (⌘P)")
+        pinButton = NSButton(
+            image: NSImage(systemSymbolName: "pin", accessibilityDescription: nil) ?? NSImage(),
+            target: self,
+            action: #selector(pinClicked)
+        )
+        pinButton.setButtonType(.toggle)
+        pinButton.bezelStyle = .texturedRounded
+        pinButton.imageScaling = .scaleProportionallyDown
         pinButton.setAccessibilityIdentifier("pinButton")
+        pinButton.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        pinButton.heightAnchor.constraint(equalToConstant: 28).isActive = true
 
         languageButton = NSPopUpButton(frame: .zero, pullsDown: false)
         languageButton.controlSize = .small
@@ -221,6 +227,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         deckButton.isEnabled = false
         deckButton.setAccessibilityIdentifier("deckButton")
         deckButton.setAccessibilityLabel(Copy.text("保存到 Anki 牌组", "Save to Anki deck"))
+        deckButton.toolTip = Copy.text(
+            "这里列出 Anki 中的真实牌组，并记住上次选择",
+            "Lists your actual Anki decks and remembers the last choice"
+        )
         deckButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 164).isActive = true
         deckButton.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
         deckButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
@@ -590,10 +600,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         wordField.placeholderString = Copy.text("例如：serendipity", "e.g. serendipity")
         contextView.setAccessibilityLabel(Copy.text("例句或上下文，可选", "Example or context, optional"))
         deckButton.setAccessibilityLabel(Copy.text("保存到 Anki 牌组", "Save to Anki deck"))
-        pinButton.title = Copy.text("置顶", "Pin")
+        deckButton.toolTip = Copy.text(
+            "这里列出 Anki 中的真实牌组，并记住上次选择",
+            "Lists your actual Anki decks and remembers the last choice"
+        )
         pinButton.toolTip = Copy.text("始终显示在其他窗口上方（⌘P）", "Keep above other windows (⌘P)")
+        pinButton.setAccessibilityLabel(Copy.text("置顶", "Pin"))
         addButton.title = Copy.text("加入 Anki", "Add to Anki")
         configureLanguageButton()
+        updatePinAppearance()
     }
 
     private func loadLanguageSetting() {
@@ -780,10 +795,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         applyPin(window.level != .floating)
     }
 
+    private func updatePinAppearance() {
+        let pinned = window.level == .floating
+        let symbol = pinned ? "pin.fill" : "pin"
+        let description = Copy.text(
+            pinned ? "已置顶" : "未置顶",
+            pinned ? "Pinned" : "Not pinned"
+        )
+        let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+        pinButton.image = NSImage(
+            systemSymbolName: symbol,
+            accessibilityDescription: description
+        )?.withSymbolConfiguration(configuration)
+        pinButton.contentTintColor = pinned ? .controlAccentColor : .secondaryLabelColor
+        pinButton.setAccessibilityValue(description)
+    }
+
     private func applyPin(_ pinned: Bool) {
         window.level = pinned ? .floating : .normal
         window.collectionBehavior = pinned ? [.canJoinAllSpaces, .fullScreenAuxiliary] : []
         pinButton.state = pinned ? .on : .off
+        updatePinAppearance()
         defaults.set(pinned, forKey: "windowPinned")
     }
 

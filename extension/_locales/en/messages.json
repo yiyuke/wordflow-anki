@@ -12,6 +12,7 @@
   "wordLabel": { "message": "Word or phrase" },
   "wordPlaceholder": { "message": "e.g. serendipity" },
   "deckLabel": { "message": "Save to Anki deck" },
+  "deckHelp": { "message": "Lists your actual Anki decks and remembers the last choice" },
   "loadingDecks": { "message": "Loading decks…" },
   "contextLabel": { "message": "Example or context (optional)" },
   "contextPlaceholder": { "message": "Paste the sentence where you found it" },

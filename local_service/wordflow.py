@@ -214,7 +214,10 @@ CARD_SCHEMA: Dict[str, Any] = {
         "context_cloze": {"type": "string"},
         "collocations": {"type": "array", "items": {"type": "string"}},
         "etymology": {"type": "string"},
+        "original_image": {"type": "string"},
         "memory_hook": {"type": "string"},
+        "semantic_insight": {"type": "string"},
+        "epiphany": {"type": "string"},
         "examples": {"type": "array", "items": {"type": "string"}},
         "tags": {"type": "array", "items": {"type": "string"}},
     },
@@ -229,7 +232,10 @@ CARD_SCHEMA: Dict[str, Any] = {
         "context_cloze",
         "collocations",
         "etymology",
+        "original_image",
         "memory_hook",
+        "semantic_insight",
+        "epiphany",
         "examples",
         "tags",
     ],
@@ -247,11 +253,16 @@ Rules:
 - Use the supplied context to choose the relevant sense. If context is absent, give the most common modern sense.
 - pronunciation should contain IPA, preferably US and UK when they differ.
 - definition_en must use learner-friendly English.
+- Make the relevant sense precise: distinguish it from the nearest commonly confused word instead of giving a circular synonym list.
 - Keep the original context unchanged except for whitespace cleanup. Do not invent a source sentence.
 - context_cloze should replace the complete selected word or complete multiword expression (including an inflected form) with […]. Never blank only one token of a multiword expression. Leave it empty if context is empty.
 - Give 2-4 useful collocations and exactly 2 short, natural examples.
 - Etymology must be conservative and useful for memory. Say plainly when no reliable, useful origin is available.
-- Never present a pun or mnemonic as real etymology. Put such devices only in memory_hook.
+- original_image is one concrete physical scene that makes the current sense visible. Ground it in reliable etymology when possible; otherwise clearly treat it as a modern mental picture, not historical fact.
+- memory_hook is the core-image formula: compress the meaning into a short “A + B = C” relationship or similarly compact mnemonic.
+- semantic_insight is 2-3 concise sentences connecting the original image, core image, and the relevant modern use. It must clarify a usage boundary, not add vague inspirational prose.
+- epiphany is one memorable line that captures the word's distinctive semantic soul. Prefer precision over forced profundity.
+- Never present a mental picture, pun, formula, or mnemonic as real etymology.
 - Tags must be lowercase ASCII words joined by hyphens, and must not contain spaces.
 - Do not include HTML.
 """
@@ -261,11 +272,12 @@ def explanation_instructions(language: str) -> str:
     if language == "en":
         return """The learner's explanation language is English.
 - meaning_zh is a legacy internal field name: fill it with a short, plain-English meaning.
-- Write etymology and memory_hook in concise, natural English.
+- Write etymology, original_image, memory_hook, semantic_insight, and epiphany in concise, natural English.
 - If no reliable, useful etymology is available, write “No reliable, memory-helpful etymology found.”"""
     return """The learner's explanation language is Simplified Chinese.
 - meaning_zh must be a concise Simplified Chinese meaning.
-- Write etymology and memory_hook in concise, natural Simplified Chinese.
+- Write etymology, original_image, memory_hook, and semantic_insight in concise, natural Simplified Chinese.
+- epiphany must be one short English sentence followed by its natural Simplified Chinese rendering.
 - If no reliable, useful etymology is available, write “暂无可靠且有助记忆的词源信息”."""
 
 
@@ -379,7 +391,22 @@ def mock_card(capture: Dict[str, str]) -> Dict[str, Any]:
             if is_english
             else "暂无可靠且有助记忆的词源信息"
         ),
-        "memory_hook": "A memory hint generated in mock mode." if is_english else "模拟模式记忆提示",
+        "original_image": (
+            f"A learner sees {word} in a concrete scene."
+            if is_english
+            else f"学习者在一个具体画面中看见 {word}。"
+        ),
+        "memory_hook": f"context + {word} = meaning" if is_english else f"语境 + {word} = 词义",
+        "semantic_insight": (
+            "A short explanation connects the scene to the relevant usage."
+            if is_english
+            else "用简短解释把这个画面与当前语境中的用法连接起来。"
+        ),
+        "epiphany": (
+            f"To know {word} is to see the relationship it names."
+            if is_english
+            else f"To know {word} is to see the relationship it names. 掌握一个词，就是看见它所命名的关系。"
+        ),
         "examples": [f"This example uses {word}.", f"I learned the word {word} today."],
         "tags": ["mock", "english"],
     }
@@ -425,7 +452,7 @@ class OpenAICardGenerator:
                     "schema": CARD_SCHEMA,
                 }
             },
-            "max_output_tokens": 1400,
+            "max_output_tokens": 1600,
         }
         response = _request_json(
             f"{self.config.openai_base_url}/responses",
@@ -479,7 +506,10 @@ def normalize_card(card: Dict[str, Any], capture: Dict[str, str]) -> Dict[str, A
         "definition_en",
         "context_cloze",
         "etymology",
+        "original_image",
         "memory_hook",
+        "semantic_insight",
+        "epiphany",
     ):
         normalized[name] = str(normalized.get(name, "")).strip()
     for name in ("collocations", "examples", "tags"):
@@ -500,7 +530,7 @@ def normalize_card(card: Dict[str, Any], capture: Dict[str, str]) -> Dict[str, A
     return normalized
 
 
-CARD_CSS = """
+CARD_CSS = """/* wordflow-managed:2 */
 .card {
   --wf-bg: #f8fafc;
   --wf-surface: #ffffff;
@@ -550,6 +580,17 @@ CARD_CSS = """
 .meaning { color: var(--wf-accent) !important; font-size: 25px; font-weight: 700; }
 .section { margin-top: 16px; color: var(--wf-text) !important; }
 .label { color: var(--wf-muted) !important; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.insight {
+  padding: 16px;
+  border: 1px solid var(--wf-border);
+  border-radius: 10px;
+  background: var(--wf-surface) !important;
+}
+.insight-item + .insight-item { margin-top: 11px; }
+.insight-label { color: var(--wf-muted) !important; font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.insight-value { margin-top: 2px; color: var(--wf-text) !important; }
+.insight-item.core .insight-value { color: var(--wf-accent) !important; font-weight: 700; }
+.insight-item.epiphany .insight-value { font-style: italic; }
 ul { margin: 8px 0; padding-left: 1.35em; }
 li { margin: 4px 0; color: var(--wf-text) !important; }
 hr { margin: 22px 0; border: 0; border-top: 1px solid var(--wf-border); }
@@ -558,11 +599,14 @@ a { color: var(--wf-accent) !important; text-decoration-thickness: 1px; text-und
 """
 
 
+LEGACY_RECOGNITION_BACK = "{{FrontSide}}<hr><div class='meaning'>{{MeaningZH}}</div><div class='section'><div class='label'>Definition</div>{{DefinitionEN}}</div><div class='section'><div class='label'>Collocations</div>{{Collocations}}</div><div class='section'><div class='label'>Etymology</div>{{Etymology}}</div><div class='section'><div class='label'>Memory hook</div>{{MemoryHook}}</div><div class='section'><div class='label'>Examples</div>{{Examples}}</div><div class='source'><a href='{{SourceURL}}'>{{SourceTitle}}</a></div>"
+
+
 CARD_TEMPLATES = [
     {
         "Name": "Recognition",
         "Front": "<div class='word'>{{Word}}</div><div class='pron'>{{Pronunciation}}</div>{{Audio}}<div class='context'>{{Context}}</div>",
-        "Back": "{{FrontSide}}<hr><div class='meaning'>{{MeaningZH}}</div><div class='section'><div class='label'>Definition</div>{{DefinitionEN}}</div><div class='section'><div class='label'>Collocations</div>{{Collocations}}</div><div class='section'><div class='label'>Etymology</div>{{Etymology}}</div><div class='section'><div class='label'>Memory hook</div>{{MemoryHook}}</div><div class='section'><div class='label'>Examples</div>{{Examples}}</div><div class='source'><a href='{{SourceURL}}'>{{SourceTitle}}</a></div>",
+        "Back": "<!-- wordflow-managed:2 -->{{FrontSide}}<hr><div class='meaning'>{{MeaningZH}}</div><div class='section'><div class='label'>Definition</div>{{DefinitionEN}}</div><div class='section'><div class='label'>Collocations</div>{{Collocations}}</div><div class='section insight'><div class='label'>Word insight</div>{{MemoryHook}}</div><div class='section'><div class='label'>Etymology</div>{{Etymology}}</div><div class='section'><div class='label'>Examples</div>{{Examples}}</div><div class='source'><a href='{{SourceURL}}'>{{SourceTitle}}</a></div>",
     },
     {
         "Name": "Production",
@@ -579,6 +623,42 @@ def html_text(value: Any) -> str:
 def html_items(values: Iterable[str]) -> str:
     items = [f"<li>{html_text(value)}</li>" for value in values if value]
     return f"<ul>{''.join(items)}</ul>" if items else ""
+
+
+def html_word_insight(card: Dict[str, Any], language: str) -> str:
+    labels = (
+        {
+            "original_image": "原始画面",
+            "memory_hook": "核心意象",
+            "semantic_insight": "解释",
+            "epiphany": "一语道破",
+        }
+        if language == "zh"
+        else {
+            "original_image": "Original image",
+            "memory_hook": "Core image",
+            "semantic_insight": "Insight",
+            "epiphany": "In one line",
+        }
+    )
+    classes = {
+        "original_image": "scene",
+        "memory_hook": "core",
+        "semantic_insight": "explanation",
+        "epiphany": "epiphany",
+    }
+    parts = []
+    for name in ("original_image", "memory_hook", "semantic_insight", "epiphany"):
+        value = str(card.get(name, "")).strip()
+        if not value:
+            continue
+        parts.append(
+            f"<div class='insight-item {classes[name]}'>"
+            f"<div class='insight-label'>{labels[name]}</div>"
+            f"<div class='insight-value'>{html_text(value)}</div>"
+            "</div>"
+        )
+    return "".join(parts)
 
 
 def safe_tag(value: str) -> str:
@@ -690,6 +770,48 @@ class AnkiClient:
         self._known_decks.update(decks)
         return sorted(decks, key=str.casefold)
 
+    def _sync_managed_model(self) -> None:
+        try:
+            current_templates = self.invoke("modelTemplates", modelName=self.config.model_name)
+            recognition = current_templates.get("Recognition", {}) if isinstance(current_templates, dict) else {}
+            production = current_templates.get("Production", {}) if isinstance(current_templates, dict) else {}
+            managed = (
+                recognition.get("Front") == CARD_TEMPLATES[0]["Front"]
+                and production.get("Front") == CARD_TEMPLATES[1]["Front"]
+                and production.get("Back") == CARD_TEMPLATES[1]["Back"]
+                and (
+                    recognition.get("Back") == LEGACY_RECOGNITION_BACK
+                    or "wordflow-managed:" in str(recognition.get("Back", ""))
+                )
+            )
+            if not managed:
+                return
+            desired_templates = {
+                template["Name"]: {
+                    "Front": template["Front"],
+                    "Back": template["Back"],
+                }
+                for template in CARD_TEMPLATES
+            }
+            if current_templates != desired_templates:
+                self.invoke(
+                    "updateModelTemplates",
+                    model={
+                        "name": self.config.model_name,
+                        "templates": desired_templates,
+                    },
+                )
+            current_styling = self.invoke("modelStyling", modelName=self.config.model_name)
+            if not isinstance(current_styling, dict) or current_styling.get("css") != CARD_CSS:
+                self.invoke(
+                    "updateModelStyling",
+                    model={"name": self.config.model_name, "css": CARD_CSS},
+                )
+        except RuntimeError:
+            # Card creation should remain usable with older AnkiConnect versions
+            # or a user-customized note type.
+            return
+
     def ensure_model(self, deck_name: Optional[str] = None) -> None:
         if self.config.mock_anki:
             return
@@ -714,6 +836,8 @@ class AnkiClient:
                         isCloze=False,
                         cardTemplates=CARD_TEMPLATES,
                     )
+                else:
+                    self._sync_managed_model()
                 self._model_ready = True
 
     def note_deck(self, note_id: int) -> str:
@@ -771,7 +895,7 @@ class AnkiClient:
             "ContextCloze": html_text(card["context_cloze"]),
             "Collocations": html_items(card["collocations"]),
             "Etymology": html_text(card["etymology"]),
-            "MemoryHook": html_text(card["memory_hook"]),
+            "MemoryHook": html_word_insight(card, capture["language"]),
             "Examples": html_items(card["examples"]),
             "SourceTitle": html_text(capture["source_title"]),
             "SourceURL": html.escape(capture["source_url"], quote=True),
@@ -840,7 +964,7 @@ class WordflowApp:
         return {
             "ok": True,
             "service": "wordflow-to-anki",
-            "version": "0.6.1",
+            "version": "0.6.2",
             "openai_configured": bool(self.config.openai_api_key) or self.config.mock_openai,
             "model": self.config.openai_model,
             "deck": self.preferences.default_deck(self.config.deck_name),

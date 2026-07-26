@@ -15,13 +15,16 @@ sys.path.insert(0, str(SERVICE_DIR))
 
 from wordflow import (  # noqa: E402
     AnkiClient,
+    CARD_TEMPLATES,
     CARD_CSS,
     Config,
+    LEGACY_RECOGNITION_BACK,
     OpenAICardGenerator,
     WordflowApp,
     _request_json,
     extract_response_text,
     html_items,
+    html_word_insight,
     identity_tag,
     keychain_secret,
     normalize_card,
@@ -144,6 +147,21 @@ class WordflowTests(unittest.TestCase):
     def test_html_is_escaped(self):
         self.assertEqual(html_items(["a < b"]), "<ul><li>a &lt; b</li></ul>")
 
+    def test_word_insight_is_structured_localized_and_escaped(self):
+        insight = html_word_insight(
+            {
+                "original_image": "light < fog",
+                "memory_hook": "light + order = clarity",
+                "semantic_insight": "A precise boundary.",
+                "epiphany": "See clearly.",
+            },
+            "zh",
+        )
+        self.assertIn("原始画面", insight)
+        self.assertIn("核心意象", insight)
+        self.assertIn("light &lt; fog", insight)
+        self.assertNotIn("light < fog", insight)
+
     def test_identity_uses_lemma_and_part_of_speech(self):
         noun = identity_tag({"lemma": "record", "part_of_speech": "noun"})
         verb = identity_tag({"lemma": "record", "part_of_speech": "verb"})
@@ -207,12 +225,66 @@ class WordflowTests(unittest.TestCase):
 
         def invoke(action, **_params):
             calls.append(action)
-            return {"deckNames": ["Test Deck"], "modelNames": ["Test Model"]}[action]
+            return {
+                "deckNames": ["Test Deck"],
+                "modelNames": ["Test Model"],
+                "modelTemplates": {
+                    template["Name"]: {
+                        "Front": template["Front"],
+                        "Back": template["Back"],
+                    }
+                    for template in CARD_TEMPLATES
+                },
+                "modelStyling": {"css": CARD_CSS},
+            }[action]
 
         client.invoke = invoke
         client.ensure_model()
         client.ensure_model()
-        self.assertEqual(calls, ["deckNames", "modelNames"])
+        self.assertEqual(calls, ["deckNames", "modelNames", "modelTemplates", "modelStyling"])
+
+    def test_legacy_wordflow_template_is_upgraded(self):
+        client = AnkiClient(replace(mock_config(), mock_anki=False))
+        calls = []
+        legacy_templates = {
+            template["Name"]: {
+                "Front": template["Front"],
+                "Back": template["Back"],
+            }
+            for template in CARD_TEMPLATES
+        }
+        legacy_templates["Recognition"]["Back"] = LEGACY_RECOGNITION_BACK
+
+        def invoke(action, **params):
+            calls.append((action, params))
+            return {
+                "modelTemplates": legacy_templates,
+                "modelStyling": {"css": "legacy css"},
+                "updateModelTemplates": None,
+                "updateModelStyling": None,
+            }[action]
+
+        client.invoke = invoke
+        client._sync_managed_model()
+        self.assertEqual(
+            [action for action, _params in calls],
+            ["modelTemplates", "updateModelTemplates", "modelStyling", "updateModelStyling"],
+        )
+
+    def test_custom_anki_template_is_not_overwritten(self):
+        client = AnkiClient(replace(mock_config(), mock_anki=False))
+        calls = []
+
+        def invoke(action, **_params):
+            calls.append(action)
+            return {
+                "Recognition": {"Front": "My custom front", "Back": "My custom back"},
+                "Production": {"Front": "My custom production", "Back": "My custom answer"},
+            }
+
+        client.invoke = invoke
+        client._sync_managed_model()
+        self.assertEqual(calls, ["modelTemplates"])
 
     def test_generation_uses_latency_reasoning_setting(self):
         capture = normalize_capture({"text": "lucid", "context": "A lucid explanation.", "language": "en"})
@@ -227,7 +299,10 @@ class WordflowTests(unittest.TestCase):
             "context_cloze": "A […] explanation.",
             "collocations": ["lucid explanation", "lucid account"],
             "etymology": "from Latin lucidus",
+            "original_image": "Light passing through a clear surface.",
             "memory_hook": "Think of light making an idea clear.",
+            "semantic_insight": "Lucid makes an idea easy to see mentally, not merely simple.",
+            "epiphany": "Clarity is light reaching the mind.",
             "examples": ["Her answer was lucid.", "He gave a lucid account."],
             "tags": ["adjective"],
         }
@@ -244,8 +319,10 @@ class WordflowTests(unittest.TestCase):
             OpenAICardGenerator(config).generate(capture)
         payload = request_json.call_args.args[1]
         self.assertEqual(payload["reasoning"], {"effort": "none"})
-        self.assertEqual(payload["max_output_tokens"], 1400)
+        self.assertEqual(payload["max_output_tokens"], 1600)
         self.assertIn("explanation language is English", payload["input"][0]["content"])
+        self.assertIn("original_image", payload["text"]["format"]["schema"]["required"])
+        self.assertIn("semantic_insight", payload["text"]["format"]["schema"]["required"])
         user_input = json.loads(payload["input"][1]["content"])
         self.assertEqual(user_input["explanation_language"], "en")
 

@@ -46,6 +46,9 @@ function localizePage() {
   document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
     element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel, undefined, element.getAttribute("aria-label")));
   });
+  document.querySelectorAll("[data-i18n-title]").forEach((element) => {
+    element.title = t(element.dataset.i18nTitle, undefined, element.title);
+  });
   $("#language").value = languagePreference;
 }
 

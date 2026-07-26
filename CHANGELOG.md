@@ -2,6 +2,14 @@
 
 All notable changes to Wordflow are documented here.
 
+## 0.6.2 — 2026-07-26
+
+- Added a structured Word Insight section: original image, core image, semantic explanation, and a memorable one-line summary.
+- Tightened definition quality by requiring sense boundaries and separating factual etymology from mental pictures.
+- Replaced the Pin checkbox and label with a compact toggleable pin icon.
+- Clarified that `Default` is Anki's real built-in deck while Wordflow remembers the last selected deck.
+- Safely upgrades Wordflow-managed Anki templates while leaving custom note-type templates untouched.
+
 ## 0.6.1 — 2026-07-26
 
 - Made `Command + A` reliably select all text in either native input field.

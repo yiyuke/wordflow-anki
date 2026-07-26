@@ -12,6 +12,7 @@
   "wordLabel": { "message": "单词或短语" },
   "wordPlaceholder": { "message": "例如：serendipity" },
   "deckLabel": { "message": "保存到 Anki 牌组" },
+  "deckHelp": { "message": "这里列出 Anki 中的真实牌组，并记住上次选择" },
   "loadingDecks": { "message": "读取牌组…" },
   "contextLabel": { "message": "例句或上下文（可选）" },
   "contextPlaceholder": { "message": "粘贴看到这个词的原句" },
