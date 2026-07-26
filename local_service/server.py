@@ -94,7 +94,7 @@ def open_quick_add_window() -> Dict[str, Any]:
 
 class Handler(BaseHTTPRequestHandler):
     app: WordflowApp
-    server_version = "Wordflow/0.6"
+    server_version = "Wordflow/0.6.1"
 
     def _headers(self, status: int = 200) -> None:
         origin = self.headers.get("Origin", "").strip()
@@ -134,6 +134,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": True, **self.app.decks()})
             except Exception as error:
                 self._json({"ok": False, "error": str(error)}, 502)
+        elif path == "/api/settings":
+            origin = self.headers.get("Origin", "").strip()
+            if not is_allowed_origin(origin) or not is_valid_client_header(self.headers.get(CLIENT_HEADER, "")):
+                self._json({"ok": False, "error": "不允许的请求来源"}, 403)
+                return
+            self._json({"ok": True, **self.app.settings()})
         else:
             self._json({"ok": False, "error": "Not found"}, 404)
 
@@ -161,6 +167,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": True, **self.app.generate(payload)})
             elif path == "/api/decks/select":
                 self._json(self.app.select_deck(payload))
+            elif path == "/api/settings/language":
+                self._json(self.app.select_language(payload))
             elif path == "/api/window/open":
                 self._json(open_quick_add_window())
             else:

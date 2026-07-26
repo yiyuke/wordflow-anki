@@ -2,6 +2,12 @@
 
 All notable changes to Wordflow are documented here.
 
+## 0.6.1 — 2026-07-26
+
+- Made `Command + A` reliably select all text in either native input field.
+- Added an `Auto / 中文 / English` language selector shared by the native window and browser fallback.
+- Kept complete multiword expressions on the card front and in context cloze sentences, even when model output narrows them to one word.
+
 ## 0.6.0 — 2026-07-22
 
 - Added automatic English and Simplified Chinese UI localization.

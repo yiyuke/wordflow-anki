@@ -1,12 +1,37 @@
 const MENU_ID = "wordflow-add-to-anki";
 const DEFAULT_SERVICE_URL = "http://127.0.0.1:8766";
+let languagePreference = "auto";
+let messageCatalog = {};
 
 function t(key, substitutions, fallback = key) {
-  return chrome.i18n.getMessage(key, substitutions) || fallback;
+  const entry = messageCatalog[key];
+  if (!entry?.message) return chrome.i18n.getMessage(key, substitutions) || fallback;
+  let message = entry.message;
+  const values = Array.isArray(substitutions) ? substitutions : substitutions == null ? [] : [substitutions];
+  Object.entries(entry.placeholders || {}).forEach(([name, placeholder]) => {
+    const index = Number(String(placeholder.content || "").replace("$", "")) - 1;
+    const replacement = Number.isInteger(index) && index >= 0 ? String(values[index] ?? "") : "";
+    message = message.replace(new RegExp(`\\$${name}\\$`, "gi"), replacement);
+  });
+  return message;
+}
+
+function systemLanguageCode() {
+  return chrome.i18n.getUILanguage().toLowerCase().startsWith("zh") ? "zh" : "en";
 }
 
 function languageCode() {
-  return chrome.i18n.getUILanguage().toLowerCase().startsWith("zh") ? "zh" : "en";
+  return ["zh", "en"].includes(languagePreference) ? languagePreference : systemLanguageCode();
+}
+
+async function loadMessageCatalog() {
+  const locale = languageCode() === "zh" ? "zh_CN" : "en";
+  try {
+    const response = await fetch(chrome.runtime.getURL(`_locales/${locale}/messages.json`));
+    messageCatalog = await response.json();
+  } catch (_error) {
+    messageCatalog = {};
+  }
 }
 
 function friendlyMessage(error) {
@@ -36,11 +61,39 @@ function installContextMenu() {
   });
 }
 
-chrome.runtime.onInstalled.addListener(installContextMenu);
-chrome.runtime.onStartup.addListener(installContextMenu);
+async function refreshContextMenu() {
+  await loadLanguagePreference();
+  await loadMessageCatalog();
+  installContextMenu();
+}
+
+chrome.runtime.onInstalled.addListener(() => refreshContextMenu());
+chrome.runtime.onStartup.addListener(() => refreshContextMenu());
 
 async function settings() {
-  return chrome.storage.sync.get({ serviceUrl: DEFAULT_SERVICE_URL });
+  return chrome.storage.sync.get({
+    serviceUrl: DEFAULT_SERVICE_URL,
+    languagePreference: "auto"
+  });
+}
+
+async function loadLanguagePreference() {
+  const saved = await settings();
+  if (["auto", "zh", "en"].includes(saved.languagePreference)) {
+    languagePreference = saved.languagePreference;
+  }
+  try {
+    const response = await fetch(`${saved.serviceUrl.replace(/\/$/, "")}/api/settings`, {
+      headers: { "X-Wordflow-Client": "wordflow-local" }
+    });
+    const data = await response.json();
+    if (response.ok && data.ok && ["auto", "zh", "en"].includes(data.language)) {
+      languagePreference = data.language;
+      await chrome.storage.sync.set({ languagePreference });
+    }
+  } catch (_error) {
+    // The browser's saved or automatic language remains available offline.
+  }
 }
 
 async function getContext(tabId) {
@@ -63,6 +116,9 @@ async function showResult(tabId, message, kind) {
 }
 
 async function capture(payload, tabId) {
+  await loadLanguagePreference();
+  await loadMessageCatalog();
+  payload.language = languageCode();
   const { serviceUrl } = await settings();
   try {
     const response = await fetch(`${serviceUrl.replace(/\/$/, "")}/api/capture`, {
@@ -134,6 +190,13 @@ async function openManualInput() {
 
 chrome.action.onClicked.addListener(() => openManualInput());
 
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "LANGUAGE_CHANGED" && ["auto", "zh", "en"].includes(message.language)) {
+    languagePreference = message.language;
+    loadMessageCatalog().then(installContextMenu);
+  }
+});
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== MENU_ID) return;
   const selected = (info.selectionText || "").trim();
@@ -154,6 +217,8 @@ chrome.commands.onCommand.addListener(async (command) => {
     return;
   }
   if (command !== "capture-selection") return;
+  await loadLanguagePreference();
+  await loadMessageCatalog();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const selected = await getContext(tab?.id);
   if (!selected.text) {

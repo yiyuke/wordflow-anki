@@ -7,6 +7,8 @@
   "contextMenuTitle": { "message": "加入 Anki：%s" },
   "popupTitle": { "message": "快速添加到 Anki" },
   "openWindow": { "message": "打开窗口：⌥⇧W" },
+  "languageLabel": { "message": "界面与词卡解释语言" },
+  "languageSaveFailed": { "message": "语言设置未保存" },
   "wordLabel": { "message": "单词或短语" },
   "wordPlaceholder": { "message": "例如：serendipity" },
   "deckLabel": { "message": "保存到 Anki 牌组" },

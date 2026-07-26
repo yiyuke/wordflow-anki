@@ -24,6 +24,7 @@ from wordflow import (  # noqa: E402
     html_items,
     identity_tag,
     keychain_secret,
+    normalize_card,
     normalize_deck_name,
     normalize_capture,
 )
@@ -170,6 +171,35 @@ class WordflowTests(unittest.TestCase):
             restored.anki.deck_names = lambda: ["English from real life", "Test Deck"]
             self.assertEqual(restored.decks()["selected"], "English from real life")
             self.assertEqual(result["deck"], "English from real life")
+
+    def test_language_preference_is_persisted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            preferences = Path(directory) / "preferences.json"
+            app = WordflowApp(mock_config(), preferences_path=preferences)
+            self.assertEqual(app.settings()["language"], "auto")
+            self.assertEqual(app.select_language({"language": "en"})["language"], "en")
+            restored = WordflowApp(mock_config(), preferences_path=preferences)
+            self.assertEqual(restored.settings()["language"], "en")
+            with self.assertRaises(ValueError):
+                app.select_language({"language": "unsupported"})
+
+    def test_multiword_capture_keeps_the_complete_phrase(self):
+        capture = normalize_capture(
+            {
+                "text": "chimed in",
+                "context": "Somebody suddenly chimed in.",
+                "language": "en",
+            }
+        )
+        model_card = {
+            "word": "chimed",
+            "lemma": "chime",
+            "context_cloze": "Somebody suddenly […] in.",
+        }
+        card = normalize_card(model_card, capture)
+        self.assertEqual(card["word"], "chimed in")
+        self.assertEqual(card["lemma"], "chimed in")
+        self.assertEqual(card["context_cloze"], "Somebody suddenly […].")
 
     def test_anki_model_check_is_cached(self):
         client = AnkiClient(replace(mock_config(), mock_anki=False))

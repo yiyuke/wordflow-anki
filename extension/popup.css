@@ -7,9 +7,13 @@
 
 body { margin: 0; min-width: 380px; background: #f8fafc; }
 main { box-sizing: border-box; max-width: 520px; margin: 0 auto; padding: 22px; }
-header { margin-bottom: 18px; }
+header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
 h1 { margin: 0; font-size: 21px; letter-spacing: -.35px; }
 header p { margin: 4px 0 0; color: #067647; font-size: 13px; font-weight: 700; }
+header #language {
+  width: auto; min-width: 82px; height: 30px; padding: 4px 26px 4px 8px;
+  border-radius: 8px; font-size: 12px; font-weight: 650; resize: none;
+}
 label { display: block; margin: 16px 0 8px; color: #344054; font-size: 14px; font-weight: 700; }
 input, textarea, select {
   box-sizing: border-box; width: 100%; border: 1px solid #d0d5dd; border-radius: 9px;

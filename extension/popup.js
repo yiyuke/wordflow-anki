@@ -1,13 +1,38 @@
 const DEFAULT_SERVICE_URL = "http://127.0.0.1:8766";
 const $ = (selector) => document.querySelector(selector);
 let resultClearTimer;
+let languagePreference = "auto";
+let messageCatalog = {};
 
 function t(key, substitutions, fallback = key) {
-  return chrome.i18n.getMessage(key, substitutions) || fallback;
+  const entry = messageCatalog[key];
+  if (!entry?.message) return chrome.i18n.getMessage(key, substitutions) || fallback;
+  let message = entry.message;
+  const values = Array.isArray(substitutions) ? substitutions : substitutions == null ? [] : [substitutions];
+  Object.entries(entry.placeholders || {}).forEach(([name, placeholder]) => {
+    const index = Number(String(placeholder.content || "").replace("$", "")) - 1;
+    const replacement = Number.isInteger(index) && index >= 0 ? String(values[index] ?? "") : "";
+    message = message.replace(new RegExp(`\\$${name}\\$`, "gi"), replacement);
+  });
+  return message;
+}
+
+function systemLanguageCode() {
+  return chrome.i18n.getUILanguage().toLowerCase().startsWith("zh") ? "zh" : "en";
 }
 
 function languageCode() {
-  return chrome.i18n.getUILanguage().toLowerCase().startsWith("zh") ? "zh" : "en";
+  return ["zh", "en"].includes(languagePreference) ? languagePreference : systemLanguageCode();
+}
+
+async function loadMessageCatalog() {
+  const locale = languageCode() === "zh" ? "zh_CN" : "en";
+  try {
+    const response = await fetch(chrome.runtime.getURL(`_locales/${locale}/messages.json`));
+    messageCatalog = await response.json();
+  } catch (_error) {
+    messageCatalog = {};
+  }
 }
 
 function localizePage() {
@@ -18,6 +43,10 @@ function localizePage() {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
     element.placeholder = t(element.dataset.i18nPlaceholder, undefined, element.placeholder);
   });
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+    element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel, undefined, element.getAttribute("aria-label")));
+  });
+  $("#language").value = languagePreference;
 }
 
 function setResult(message, { error = false, clearAfter = 0 } = {}) {
@@ -52,6 +81,42 @@ function friendlyMessage(error) {
 async function getServiceUrl() {
   const data = await chrome.storage.sync.get({ serviceUrl: DEFAULT_SERVICE_URL });
   return data.serviceUrl.replace(/\/$/, "");
+}
+
+async function loadLanguagePreference() {
+  const stored = await chrome.storage.sync.get({ languagePreference: "auto" });
+  if (["auto", "zh", "en"].includes(stored.languagePreference)) {
+    languagePreference = stored.languagePreference;
+  }
+  try {
+    const response = await fetch(`${await getServiceUrl()}/api/settings`, {
+      headers: clientHeaders()
+    });
+    const data = await response.json();
+    if (response.ok && data.ok && ["auto", "zh", "en"].includes(data.language)) {
+      languagePreference = data.language;
+      await chrome.storage.sync.set({ languagePreference });
+    }
+  } catch (_error) {
+    // The saved browser preference and automatic language remain available offline.
+  }
+}
+
+async function saveLanguagePreference() {
+  languagePreference = $("#language").value;
+  await chrome.storage.sync.set({ languagePreference });
+  await loadMessageCatalog();
+  localizePage();
+  chrome.runtime.sendMessage({ type: "LANGUAGE_CHANGED", language: languagePreference }).catch(() => {});
+  const response = await fetch(`${await getServiceUrl()}/api/settings/language`, {
+    method: "POST",
+    headers: clientHeaders(),
+    body: JSON.stringify({ language: languagePreference })
+  });
+  const data = await response.json();
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error || t("languageSaveFailed", undefined, "Could not save the language"));
+  }
 }
 
 async function checkHealth() {
@@ -154,6 +219,8 @@ async function addWord(returnAfterSave = false) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  await loadLanguagePreference();
+  await loadMessageCatalog();
   localizePage();
   $("#word").focus();
   checkHealth();
@@ -162,6 +229,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 $("#add").addEventListener("click", addWord);
 $("#deck").addEventListener("change", () => {
   saveDeck().catch((error) => {
+    setResult(friendlyMessage(error), { error: true, clearAfter: 10000 });
+  });
+});
+$("#language").addEventListener("change", () => {
+  saveLanguagePreference().catch((error) => {
     setResult(friendlyMessage(error), { error: true, clearAfter: 10000 });
   });
 });

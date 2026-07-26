@@ -37,7 +37,7 @@ See a word → Capture once → Review in Anki
 - **Learn actively.** Every note creates recognition and production cards instead of a passive word list.
 - **Stay in your flow.** The compact native window can stay on top and works without a mouse.
 - **Use your own system.** Choose any Anki deck; light and dark card themes are included.
-- **English and Chinese.** The extension, native window, and card explanations follow your browser/macOS language automatically.
+- **English and Chinese.** Use `Auto / 中文 / English` in Quick Add. Auto follows the browser/macOS language; a manual choice changes both the interface and card explanations.
 
 ### What it is
 
@@ -104,6 +104,8 @@ Arc can install Chrome Web Store extensions directly, so a future store release 
 - Press `Option + Shift + A` to capture the current browser selection.
 - Press `Option + Shift + W` to open Quick Add from Word, PDFs, podcast notes, or any other app.
 - Press `Command + D` in Quick Add to choose a deck.
+- Choose `Auto / 中文 / English` at the top right. `Auto` follows Arc/Chrome or macOS; a manual choice is remembered across the native and browser windows.
+- Press `Command + A` in either input to select all of its text.
 - Press `Enter` to save and keep typing.
 - Press `Command + Enter` to save, leave the pinned card visible, and return focus to the previous app.
 - Press `Command + P` to pin or unpin the window; press `Esc` to close it.
@@ -112,7 +114,7 @@ New cards default to `Vocabulary Inbox`. Wordflow remembers later deck choices. 
 
 ### What goes into a card
 
-- Selected surface form and dictionary lemma
+- Complete selected word or phrase, plus its dictionary lemma
 - IPA pronunciation
 - Concise meaning in English or Simplified Chinese
 - Learner-friendly English definition
@@ -168,7 +170,7 @@ Wordflow 解决的是一个很小、但每天都会打断学习的问题：**看
 - **不是被动收藏。** 每条 Note 自动生成 Recognition 和 Production 两张卡。
 - **不打断正在做的事。** 紧凑的原生窗口支持置顶和全键盘操作。
 - **继续使用自己的 Anki。** 可以选择任意牌组，卡片支持浅色与深色模式。
-- **中英双语。** 扩展、原生窗口和卡片解释会自动跟随浏览器或 macOS 语言。
+- **中英双语。** 在快速窗口右上角选择 `自动 / 中文 / English`；自动模式跟随浏览器或 macOS，手动选择会同时切换界面与词卡解释。
 
 ### 它是什么
 
@@ -235,6 +237,8 @@ Arc 可以直接使用 Chrome Web Store 扩展，因此未来只需发布一个�
 - `Option + Shift + A`：捕捉浏览器当前选中的单词。
 - `Option + Shift + W`：从 Word、PDF、播客笔记或其他 App 打开快速输入窗。
 - `Command + D`：选择 Anki 牌组。
+- 在右上角选择 `自动 / 中文 / English`：自动模式跟随 Arc/Chrome 或 macOS，手动选择会被原生窗口和浏览器窗口共同记住。
+- 在任一输入框按 `Command + A`：全选当前输入框的内容。
 - `Enter`：保存并继续输入。
 - `Command + Enter`：保存后把焦点交回之前的 App；置顶窗口继续显示。
 - `Command + P`：切换置顶；`Esc`：关闭窗口。
@@ -243,7 +247,7 @@ Arc 可以直接使用 Chrome Web Store 扩展，因此未来只需发布一个�
 
 ### 每张卡包含什么
 
-- 选中的词形和字典原形
+- 完整保留选中的单词或短语，并附上字典原形
 - IPA 发音
 - 中文或英文简明释义
 - 适合学习者的英文定义
