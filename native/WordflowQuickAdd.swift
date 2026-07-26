@@ -194,7 +194,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             action: #selector(pinClicked)
         )
         pinButton.setButtonType(.toggle)
-        pinButton.bezelStyle = .texturedRounded
+        pinButton.isBordered = false
+        pinButton.focusRingType = .none
+        pinButton.imagePosition = .imageOnly
         pinButton.imageScaling = .scaleProportionallyDown
         pinButton.setAccessibilityIdentifier("pinButton")
         pinButton.widthAnchor.constraint(equalToConstant: 32).isActive = true
