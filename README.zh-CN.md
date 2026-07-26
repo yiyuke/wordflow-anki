@@ -47,6 +47,34 @@ Wordflow 支持选中或输入一个词，结合原句理解它，生成紧凑�
 
 > Wordflow 目前是一个早期 macOS 版本。需要 Anki、AnkiConnect、Chromium 浏览器、Python 3 和用户自己的 OpenAI API Key。在 Chrome Web Store 版本发布前，浏览器扩展需要手动加载。
 
+### 推荐：交给本地 AI 编程助手安装
+
+如果你使用能够访问这台 Mac 终端的 Codex、Claude Code 或其他 AI 编程助手，复制下面整段 Prompt 给它即可。普通聊天机器人无法直接操作本地电脑。
+
+```text
+请帮我在这台 Mac 上安装 Wordflow：
+https://github.com/yiyuke/wordflow-anki
+
+开始前，请先阅读 README.zh-CN.md 和 install.command，确认安装内容。
+请从 main 分支下载或更新项目，运行项目自带的安装程序，并验证：
+1. Wordflow 本地服务在 127.0.0.1:8766 正常运行；
+2. 原生 Quick Add 窗口可以打开；
+3. 浏览器扩展已经复制到正确的安装目录。
+
+不要让我 Fork 仓库，也不要让我把 OpenAI API Key 发到聊天里。
+只有遇到以下必须由我完成的步骤时才暂停，并给出清楚、逐步的指引：
+- 安装或打开 Anki，并在 Anki 中安装 AnkiConnect（代码：2055492159）；
+- 在本地终端的隐藏输入提示中粘贴我自己的 OpenAI API Key，让它保存到 macOS 钥匙串；
+- 在 Arc / Chrome 中确认加载扩展，或处理 macOS 的安全确认。
+
+完成后，请测试 Option + Shift + W，并告诉我是否还有需要手动完成的事情。
+```
+
+> 不要把 API Key 直接粘贴给 AI。Wordflow 自带的配置脚本会在本地隐藏输入，并把 Key 保存到 macOS 钥匙串。
+
+<details>
+<summary><strong>不使用 AI，查看传统安装步骤</strong></summary>
+
 ### 1. 下载
 
 目前还没有正式带版本号的 Release。测试当前版本可运行：
@@ -73,6 +101,8 @@ cd wordflow-anki
 1. 打开 `arc://extensions` 或 `chrome://extensions`。
 2. 开启 **Developer mode**，选择 **Load unpacked / 加载已解压的扩展程序**。
 3. 选择 `~/Library/Application Support/Wordflow/extension`。
+
+</details>
 
 ## 使用
 

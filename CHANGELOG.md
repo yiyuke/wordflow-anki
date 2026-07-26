@@ -10,6 +10,7 @@ All notable changes to Wordflow are documented here.
 - Unified the native Quick Add button, caret, focus border, selected text, shortcut label, Pin, and native menu accent around the Wordflow green palette while keeping success feedback brighter.
 - Softened the text-selection wash and native focus border so the green state remains visible without competing with the content.
 - Shortened the bilingual README around one clear idea: Anki schedules the review, and Wordflow creates the right material to review.
+- Made a copyable, terminal-agent installation prompt the primary bilingual onboarding path while keeping the complete manual steps available in a collapsed section.
 
 ## 0.7.0 — 2026-07-26
 
