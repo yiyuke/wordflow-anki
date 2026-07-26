@@ -1,0 +1,52 @@
+{
+  "extensionName": { "message": "Wordflow to Anki" },
+  "extensionDescription": { "message": "Turn new English words into rich, review-ready Anki cards." },
+  "actionTitle": { "message": "Open Wordflow Quick Add" },
+  "commandManualDescription": { "message": "Open the manual word input" },
+  "commandCaptureDescription": { "message": "Add the selected word to Anki" },
+  "contextMenuTitle": { "message": "Add to Anki: %s" },
+  "popupTitle": { "message": "Quick Add to Anki" },
+  "openWindow": { "message": "Open window: ⌥⇧W" },
+  "wordLabel": { "message": "Word or phrase" },
+  "wordPlaceholder": { "message": "e.g. serendipity" },
+  "deckLabel": { "message": "Save to Anki deck" },
+  "loadingDecks": { "message": "Loading decks…" },
+  "contextLabel": { "message": "Example or context (optional)" },
+  "contextPlaceholder": { "message": "Paste the sentence where you found it" },
+  "addButton": { "message": "Generate and add to Anki" },
+  "keyboardHint": { "message": "↓/Tab move · ⌘D deck · ⌘↩ save & return · Esc close" },
+  "errorGeneric": { "message": "Something went wrong" },
+  "ankiLaunchFailed": { "message": "Could not open Anki" },
+  "ankiDisconnected": { "message": "Anki is not connected" },
+  "apiKeyMissing": { "message": "Set up your OpenAI API key first" },
+  "networkFailed": { "message": "Network error — try again" },
+  "serviceDisconnected": { "message": "Wordflow service is not connected" },
+  "decksLoadFailed": { "message": "Could not load Anki decks" },
+  "deckSaveFailed": { "message": "Could not save the deck choice" },
+  "wordRequired": { "message": "Enter a word or phrase first" },
+  "generating": { "message": "Creating your card…" },
+  "sourceManual": { "message": "Wordflow manual input" },
+  "duplicateInDeck": {
+    "message": "“$WORD$” already exists in $DECK$",
+    "placeholders": {
+      "word": { "content": "$1" },
+      "deck": { "content": "$2" }
+    }
+  },
+  "addedToDeck": {
+    "message": "Added to $DECK$: $WORD$",
+    "placeholders": {
+      "deck": { "content": "$1" },
+      "word": { "content": "$2" }
+    }
+  },
+  "duplicateInAnki": {
+    "message": "“$WORD$” is already in Anki",
+    "placeholders": { "word": { "content": "$1" } }
+  },
+  "addedToAnki": {
+    "message": "Added to Anki: $WORD$",
+    "placeholders": { "word": { "content": "$1" } }
+  },
+  "selectionRequired": { "message": "Select a word or phrase first" }
+}

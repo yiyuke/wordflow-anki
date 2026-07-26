@@ -1,8 +1,10 @@
 .DS_Store
 .env
+preferences.json
 __pycache__/
 *.py[cod]
 *.log
 .idea/
 .vscode/
-
+native/build/
+dist/

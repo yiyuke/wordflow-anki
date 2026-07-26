@@ -1,0 +1,52 @@
+{
+  "extensionName": { "message": "Wordflow to Anki" },
+  "extensionDescription": { "message": "把遇到的英文生词变成内容丰富、可以直接复习的 Anki 卡片。" },
+  "actionTitle": { "message": "打开 Wordflow 快速添加" },
+  "commandManualDescription": { "message": "打开手动输入窗口" },
+  "commandCaptureDescription": { "message": "把选中的单词加入 Anki" },
+  "contextMenuTitle": { "message": "加入 Anki：%s" },
+  "popupTitle": { "message": "快速添加到 Anki" },
+  "openWindow": { "message": "打开窗口：⌥⇧W" },
+  "wordLabel": { "message": "单词或短语" },
+  "wordPlaceholder": { "message": "例如：serendipity" },
+  "deckLabel": { "message": "保存到 Anki 牌组" },
+  "loadingDecks": { "message": "读取牌组…" },
+  "contextLabel": { "message": "例句或上下文（可选）" },
+  "contextPlaceholder": { "message": "粘贴看到这个词的原句" },
+  "addButton": { "message": "生成并加入 Anki" },
+  "keyboardHint": { "message": "↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存切回 · Esc 关闭" },
+  "errorGeneric": { "message": "操作失败" },
+  "ankiLaunchFailed": { "message": "Anki 启动失败，请手动打开" },
+  "ankiDisconnected": { "message": "Anki 未连接，请稍后重试" },
+  "apiKeyMissing": { "message": "请先配置 OpenAI API Key" },
+  "networkFailed": { "message": "网络连接失败，请稍后重试" },
+  "serviceDisconnected": { "message": "Wordflow 服务未连接" },
+  "decksLoadFailed": { "message": "无法读取牌组" },
+  "deckSaveFailed": { "message": "牌组选择未保存" },
+  "wordRequired": { "message": "请先输入一个单词或短语" },
+  "generating": { "message": "正在生成词卡…" },
+  "sourceManual": { "message": "Wordflow 手动输入" },
+  "duplicateInDeck": {
+    "message": "“$WORD$” 已存在于 $DECK$",
+    "placeholders": {
+      "word": { "content": "$1" },
+      "deck": { "content": "$2" }
+    }
+  },
+  "addedToDeck": {
+    "message": "已加入 $DECK$：$WORD$",
+    "placeholders": {
+      "deck": { "content": "$1" },
+      "word": { "content": "$2" }
+    }
+  },
+  "duplicateInAnki": {
+    "message": "“$WORD$” 已经在 Anki 里",
+    "placeholders": { "word": { "content": "$1" } }
+  },
+  "addedToAnki": {
+    "message": "已加入 Anki：$WORD$",
+    "placeholders": { "word": { "content": "$1" } }
+  },
+  "selectionRequired": { "message": "请先选中一个单词或短语" }
+}
