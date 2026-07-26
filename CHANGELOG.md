@@ -2,6 +2,37 @@
 
 All notable changes to Wordflow are documented here.
 
+## 0.7.1 — 2026-07-26
+
+- Increased the top breathing room on the browser fallback page.
+- Replaced native language and deck selectors with accessible keyboard-friendly comboboxes whose menus open below their triggers without moving the form.
+- Uses a restrained green focus state consistent with the primary action in light and dark modes.
+- Unified the native Quick Add button, caret, focus border, selected text, shortcut label, Pin, and native menu accent around the Wordflow green palette while keeping success feedback brighter.
+- Softened the text-selection wash and native focus border so the green state remains visible without competing with the content.
+- Shortened the bilingual README around one clear idea: Anki schedules the review, and Wordflow creates the right material to review.
+
+## 0.7.0 — 2026-07-26
+
+- Replaced the fixed multi-section Word Insight report with one adaptive, compact learning note.
+- Lets the model choose the most useful explanation strategy for each word or phrase, including imagery, semantic transfer, reliable etymology, usage contrast, register, grammar, or phrase logic.
+- Constrains each card to 2–3 useful collocations and 1–2 easy, reusable examples.
+- Presents meaning, explanation, examples, and collocations as one continuous reading flow without labeled boxes.
+- Keeps the existing Anki note fields for a safe, automatic template upgrade.
+
+## 0.6.2 — 2026-07-26
+
+- Added a structured Word Insight section: original image, core image, semantic explanation, and a memorable one-line summary.
+- Tightened definition quality by requiring sense boundaries and separating factual etymology from mental pictures.
+- Replaced the Pin checkbox and label with a compact toggleable pin icon.
+- Clarified that `Default` is Anki's real built-in deck while Wordflow remembers the last selected deck.
+- Safely upgrades Wordflow-managed Anki templates while leaving custom note-type templates untouched.
+
+## 0.6.1 — 2026-07-26
+
+- Made `Command + A` reliably select all text in either native input field.
+- Added an `Auto / 中文 / English` language selector shared by the native window and browser fallback.
+- Kept complete multiword expressions on the card front and in context cloze sentences, even when model output narrows them to one word.
+
 ## 0.6.0 — 2026-07-22
 
 - Added automatic English and Simplified Chinese UI localization.

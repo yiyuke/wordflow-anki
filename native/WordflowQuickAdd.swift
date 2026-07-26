@@ -2,20 +2,61 @@ import AppKit
 import Darwin
 import Foundation
 
+@MainActor
 private enum Copy {
-    static let languageCode: String = {
+    static var preference = "auto"
+
+    static let systemLanguageCode: String = {
         let override = ProcessInfo.processInfo.environment["WORDFLOW_UI_LANGUAGE"]?.lowercased()
         if override == "zh" || override == "en" { return override! }
         return Locale.preferredLanguages.first?.lowercased().hasPrefix("zh") == true ? "zh" : "en"
     }()
-    static let isChinese = languageCode == "zh"
+    static var languageCode: String {
+        preference == "zh" || preference == "en" ? preference : systemLanguageCode
+    }
+    static var isChinese: Bool { languageCode == "zh" }
 
     static func text(_ chinese: String, _ english: String) -> String {
         isChinese ? chinese : english
     }
 }
 
+private enum Brand {
+    static let primary = NSColor(
+        name: NSColor.Name("WordflowPrimary"),
+        dynamicProvider: { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return NSColor(
+                srgbRed: isDark ? 23.0 / 255.0 : 6.0 / 255.0,
+                green: isDark ? 178.0 / 255.0 : 118.0 / 255.0,
+                blue: isDark ? 106.0 / 255.0 : 71.0 / 255.0,
+                alpha: 1
+            )
+        }
+    )
+
+    static let selectionBackground = NSColor(
+        name: NSColor.Name("WordflowSelectionBackground"),
+        dynamicProvider: { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return NSColor(
+                srgbRed: isDark ? 29.0 / 255.0 : 232.0 / 255.0,
+                green: isDark ? 74.0 / 255.0 : 245.0 / 255.0,
+                blue: isDark ? 53.0 / 255.0 : 237.0 / 255.0,
+                alpha: 1
+            )
+        }
+    )
+}
+
 private final class InputSurfaceView: NSView {
+    var isFocused = false {
+        didSet {
+            guard oldValue != isFocused else { return }
+            needsDisplay = true
+        }
+    }
+
     override var wantsUpdateLayer: Bool { true }
 
     override func updateLayer() {
@@ -24,11 +65,15 @@ private final class InputSurfaceView: NSView {
             calibratedWhite: isDark ? 0.16 : 0.96,
             alpha: 1
         ).cgColor
-        layer?.borderColor = NSColor(
-            srgbRed: isDark ? 0.28 : 0.82,
-            green: isDark ? 0.33 : 0.84,
-            blue: isDark ? 0.40 : 0.87,
-            alpha: 1
+        layer?.borderColor = (
+            isFocused
+                ? Brand.primary.withAlphaComponent(isDark ? 0.9 : 0.62)
+                : NSColor(
+                    srgbRed: isDark ? 0.28 : 0.82,
+                    green: isDark ? 0.33 : 0.84,
+                    blue: isDark ? 0.40 : 0.87,
+                    alpha: 1
+                )
         ).cgColor
         layer?.borderWidth = 1
         layer?.cornerRadius = 9
@@ -41,6 +86,7 @@ private final class QuickAddWindow: NSWindow {
     var deckHandler: (() -> Void)?
     var pinHandler: (() -> Void)?
     var closeHandler: (() -> Void)?
+    var selectAllHandler: (() -> Bool)?
 
     override func keyDown(with event: NSEvent) {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -57,6 +103,9 @@ private final class QuickAddWindow: NSWindow {
             deckHandler?()
             return
         }
+        if modifiers.contains(.command), key == "a", selectAllHandler?() == true {
+            return
+        }
         if modifiers.contains(.command) && (event.keyCode == 36 || event.keyCode == 76) {
             submitHandler?()
             return
@@ -68,6 +117,19 @@ private final class ContextTextView: NSTextView {
     var focusWordHandler: (() -> Void)?
     var focusNextHandler: (() -> Void)?
     var submitHandler: (() -> Void)?
+    var focusChangedHandler: ((Bool) -> Void)?
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { focusChangedHandler?(true) }
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let accepted = super.resignFirstResponder()
+        if accepted { focusChangedHandler?(false) }
+        return accepted
+    }
 
     override func keyDown(with event: NSEvent) {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -98,11 +160,20 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var window: QuickAddWindow!
     private var wordField: NSTextField!
     private var contextView: ContextTextView!
+    private var wordSurface: InputSurfaceView!
+    private var contextSurface: InputSurfaceView!
     private var deckButton: NSPopUpButton!
     private var addButton: NSButton!
     private var pinButton: NSButton!
+    private var languageButton: NSPopUpButton!
     private var statusLabel: NSTextField!
     private var progress: NSProgressIndicator!
+    private var titleLabel: NSTextField!
+    private var subtitleLabel: NSTextField!
+    private var wordLabel: NSTextField!
+    private var deckLabel: NSTextField!
+    private var contextLabel: NSTextField!
+    private var hintLabel: NSTextField!
     private var keyMonitor: Any?
     private var showSignalSource: DispatchSourceSignal?
     private var previousApplication: NSRunningApplication?
@@ -110,6 +181,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var activeDeck = "Vocabulary Inbox"
     private var statusGeneration = 0
     private var isLoadingDecks = false
+    private var isLoadingLanguage = false
     private var isSubmitting = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -157,35 +229,53 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         window.deckHandler = { [weak self] in self?.showDeckMenu() }
         window.pinHandler = { [weak self] in self?.togglePin() }
         window.closeHandler = { [weak self] in self?.hideWindow() }
+        window.selectAllHandler = { [weak self] in self?.selectAllInFocusedInput() ?? false }
 
         let content = NSView()
         content.translatesAutoresizingMaskIntoConstraints = false
         window.contentView = content
 
-        let title = label(Copy.text("快速添加到 Anki", "Quick Add to Anki"), size: 21, weight: .bold, color: .labelColor)
-        let subtitle = label(Copy.text("打开窗口：⌥⇧W", "Open window: ⌥⇧W"), size: 13, weight: .semibold, color: .controlAccentColor)
-        let titleStack = NSStackView(views: [title, subtitle])
+        titleLabel = label(Copy.text("快速添加到 Anki", "Quick Add to Anki"), size: 21, weight: .bold, color: .labelColor)
+        subtitleLabel = label(Copy.text("打开窗口：⌥⇧W", "Open window: ⌥⇧W"), size: 13, weight: .semibold, color: Brand.primary)
+        let titleStack = NSStackView(views: [titleLabel, subtitleLabel])
         titleStack.orientation = .vertical
         titleStack.alignment = .leading
         titleStack.spacing = 3
 
-        pinButton = NSButton(checkboxWithTitle: Copy.text("置顶", "Pin"), target: self, action: #selector(pinClicked))
-        pinButton.font = .systemFont(ofSize: 13, weight: .medium)
-        pinButton.contentTintColor = .labelColor
-        pinButton.toolTip = Copy.text("始终显示在其他窗口上方（⌘P）", "Keep above other windows (⌘P)")
+        pinButton = NSButton(
+            image: NSImage(systemSymbolName: "pin", accessibilityDescription: nil) ?? NSImage(),
+            target: self,
+            action: #selector(pinClicked)
+        )
+        pinButton.setButtonType(.momentaryChange)
+        pinButton.isBordered = false
+        pinButton.focusRingType = .none
+        pinButton.imagePosition = .imageOnly
+        pinButton.imageScaling = .scaleProportionallyDown
         pinButton.setAccessibilityIdentifier("pinButton")
+        pinButton.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        pinButton.heightAnchor.constraint(equalToConstant: 28).isActive = true
+
+        languageButton = NSPopUpButton(frame: .zero, pullsDown: false)
+        languageButton.controlSize = .small
+        languageButton.font = .systemFont(ofSize: 12, weight: .medium)
+        languageButton.target = self
+        languageButton.action = #selector(languageChanged)
+        languageButton.setAccessibilityIdentifier("languageButton")
+        languageButton.widthAnchor.constraint(equalToConstant: 82).isActive = true
+        configureLanguageButton()
 
         let headerSpacer = NSView()
         headerSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let header = NSStackView(views: [titleStack, headerSpacer, pinButton])
+        let header = NSStackView(views: [titleStack, headerSpacer, languageButton, pinButton])
         header.orientation = .horizontal
         header.alignment = .centerY
         header.spacing = 12
 
-        let wordLabel = label(Copy.text("单词或短语", "Word or phrase"), size: 14, weight: .semibold, color: .labelColor)
+        wordLabel = label(Copy.text("单词或短语", "Word or phrase"), size: 14, weight: .semibold, color: .labelColor)
         let wordHeaderSpacer = NSView()
         wordHeaderSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let deckLabel = label(Copy.text("保存到牌组", "Deck"), size: 14, weight: .semibold, color: .labelColor)
+        deckLabel = label(Copy.text("牌组", "Deck"), size: 14, weight: .semibold, color: .labelColor)
         deckButton = NSPopUpButton(frame: .zero, pullsDown: true)
         deckButton.controlSize = .regular
         deckButton.font = .systemFont(ofSize: 14, weight: .medium)
@@ -193,6 +283,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         deckButton.isEnabled = false
         deckButton.setAccessibilityIdentifier("deckButton")
         deckButton.setAccessibilityLabel(Copy.text("保存到 Anki 牌组", "Save to Anki deck"))
+        deckButton.toolTip = Copy.text(
+            "这里列出 Anki 中的真实牌组，并记住上次选择",
+            "Lists your actual Anki decks and remembers the last choice"
+        )
         deckButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 164).isActive = true
         deckButton.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
         deckButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
@@ -215,7 +309,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         wordField.setAccessibilityIdentifier("wordField")
         wordField.translatesAutoresizingMaskIntoConstraints = false
 
-        let wordSurface = InputSurfaceView()
+        wordSurface = InputSurfaceView()
         wordSurface.translatesAutoresizingMaskIntoConstraints = false
         wordSurface.addSubview(wordField)
         NSLayoutConstraint.activate([
@@ -224,7 +318,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             wordField.centerYAnchor.constraint(equalTo: wordSurface.centerYAnchor)
         ])
 
-        let contextLabel = label(Copy.text("例句或上下文（可选）", "Example or context (optional)"), size: 14, weight: .semibold, color: .labelColor)
+        contextLabel = label(Copy.text("例句或上下文（可选）", "Example or context (optional)"), size: 14, weight: .semibold, color: .labelColor)
         contextView = ContextTextView()
         contextView.font = .systemFont(ofSize: 15)
         contextView.isRichText = false
@@ -237,16 +331,21 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         contextView.focusWordHandler = { [weak self] in self?.focusWord() }
         contextView.focusNextHandler = { [weak self] in self?.focusAddButton() }
         contextView.submitHandler = { [weak self] in self?.submit(returnAfterSave: true) }
+        contextView.focusChangedHandler = { [weak self] focused in
+            self?.contextSurface.isFocused = focused
+        }
+        applyTextBranding(to: contextView)
 
         let contextScroll = NSScrollView()
         contextScroll.borderType = .noBorder
+        contextScroll.focusRingType = .none
         contextScroll.drawsBackground = false
         contextScroll.hasVerticalScroller = true
         contextScroll.autohidesScrollers = true
         contextScroll.documentView = contextView
         contextScroll.translatesAutoresizingMaskIntoConstraints = false
 
-        let contextSurface = InputSurfaceView()
+        contextSurface = InputSurfaceView()
         contextSurface.translatesAutoresizingMaskIntoConstraints = false
         contextSurface.addSubview(contextScroll)
         NSLayoutConstraint.activate([
@@ -274,14 +373,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         statusRow.detachesHiddenViews = true
         statusRow.heightAnchor.constraint(equalToConstant: 18).isActive = true
 
-        let hint = label(Copy.text(
+        hintLabel = label(Copy.text(
             "↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存切回 · Esc 关闭",
             "Tab move · ⌘D deck · ⌘↩ return · Esc close"
         ), size: 12, weight: .medium, color: .secondaryLabelColor)
         addButton = NSButton(title: Copy.text("加入 Anki", "Add to Anki"), target: self, action: #selector(addClicked))
         addButton.bezelStyle = .rounded
+        addButton.bezelColor = Brand.primary
         addButton.controlSize = .large
         addButton.font = .systemFont(ofSize: 14, weight: .semibold)
+        addButton.focusRingType = .none
         addButton.keyEquivalent = "\r"
         addButton.keyEquivalentModifierMask = [.command]
         addButton.setAccessibilityIdentifier("addButton")
@@ -289,7 +390,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
         let footerSpacer = NSView()
         footerSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let footer = NSStackView(views: [hint, footerSpacer, addButton])
+        let footer = NSStackView(views: [hintLabel, footerSpacer, addButton])
         footer.orientation = .horizontal
         footer.alignment = .centerY
         footer.spacing = 12
@@ -325,6 +426,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         contextView.nextKeyView = addButton
         addButton.nextKeyView = wordField
         applyPin(defaults.bool(forKey: "windowPinned"))
+        applyLanguage()
     }
 
     private func installKeyboardMonitor() {
@@ -345,6 +447,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             }
             if modifiers.contains(.command), key == "d" {
                 self.showDeckMenu()
+                return nil
+            }
+            if modifiers.contains(.command), key == "a", self.selectAllInFocusedInput() {
                 return nil
             }
             if modifiers.contains(.command), key == "q" {
@@ -464,6 +569,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         focusWord()
+        loadLanguageSetting()
         loadDecks()
     }
 
@@ -501,14 +607,113 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func focusWord() {
         window.makeFirstResponder(wordField)
+        wordSurface.isFocused = true
+        contextSurface.isFocused = false
+        if let editor = wordField.currentEditor() as? NSTextView {
+            applyTextBranding(to: editor)
+        }
     }
 
     private func focusContext() {
         window.makeFirstResponder(contextView)
+        wordSurface.isFocused = false
+        contextSurface.isFocused = true
     }
 
     private func focusAddButton() {
         window.makeFirstResponder(addButton)
+        wordSurface.isFocused = false
+        contextSurface.isFocused = false
+    }
+
+    private func applyTextBranding(to textView: NSTextView) {
+        textView.insertionPointColor = Brand.primary
+        textView.selectedTextAttributes = [
+            .backgroundColor: Brand.selectionBackground,
+            .foregroundColor: NSColor.labelColor,
+        ]
+    }
+
+    private func selectAllInFocusedInput() -> Bool {
+        if let editor = window.firstResponder as? NSTextView,
+           editor === contextView || editor === wordField.currentEditor() {
+            editor.selectAll(nil)
+            return true
+        }
+        if window.firstResponder === wordField {
+            wordField.selectText(nil)
+            return true
+        }
+        return false
+    }
+
+    private func configureLanguageButton() {
+        let selected = Copy.preference
+        languageButton.removeAllItems()
+        let choices = [
+            ("auto", Copy.text("自动", "Auto")),
+            ("zh", "中文"),
+            ("en", "English"),
+        ]
+        for (value, title) in choices {
+            languageButton.addItem(withTitle: title)
+            languageButton.lastItem?.representedObject = value
+        }
+        if let item = languageButton.itemArray.first(where: { ($0.representedObject as? String) == selected }) {
+            languageButton.select(item)
+        }
+        languageButton.toolTip = Copy.text("界面与词卡解释语言", "Interface and card language")
+        languageButton.setAccessibilityLabel(Copy.text("语言", "Language"))
+    }
+
+    private func applyLanguage() {
+        window.title = Copy.text("Wordflow 快速添加", "Wordflow Quick Add")
+        titleLabel.stringValue = Copy.text("快速添加到 Anki", "Quick Add to Anki")
+        subtitleLabel.stringValue = Copy.text("打开窗口：⌥⇧W", "Open window: ⌥⇧W")
+        wordLabel.stringValue = Copy.text("单词或短语", "Word or phrase")
+        deckLabel.stringValue = Copy.text("牌组", "Deck")
+        contextLabel.stringValue = Copy.text("例句或上下文（可选）", "Example or context (optional)")
+        hintLabel.stringValue = Copy.text(
+            "↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存切回 · Esc 关闭",
+            "Tab move · ⌘D deck · ⌘↩ return · Esc close"
+        )
+        wordField.placeholderString = Copy.text("例如：serendipity", "e.g. serendipity")
+        contextView.setAccessibilityLabel(Copy.text("例句或上下文，可选", "Example or context, optional"))
+        deckButton.setAccessibilityLabel(Copy.text("保存到 Anki 牌组", "Save to Anki deck"))
+        deckButton.toolTip = Copy.text(
+            "这里列出 Anki 中的真实牌组，并记住上次选择",
+            "Lists your actual Anki decks and remembers the last choice"
+        )
+        pinButton.toolTip = Copy.text("始终显示在其他窗口上方（⌘P）", "Keep above other windows (⌘P)")
+        pinButton.setAccessibilityLabel(Copy.text("置顶", "Pin"))
+        addButton.title = Copy.text("加入 Anki", "Add to Anki")
+        configureLanguageButton()
+        updatePinAppearance()
+    }
+
+    private func loadLanguageSetting() {
+        guard !isLoadingLanguage, let request = serviceRequest(path: "/api/settings") else { return }
+        isLoadingLanguage = true
+        Task {
+            defer { isLoadingLanguage = false }
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                let http = response as? HTTPURLResponse
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                guard http?.statusCode == 200,
+                      json?["ok"] as? Bool == true,
+                      let language = json?["language"] as? String,
+                      ["auto", "zh", "en"].contains(language) else {
+                    return
+                }
+                if Copy.preference != language {
+                    Copy.preference = language
+                    applyLanguage()
+                }
+            } catch {
+                // Automatic system language remains available while the local service is offline.
+            }
+        }
     }
 
     private func showDeckMenu() {
@@ -615,6 +820,34 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         }
     }
 
+    @objc private func languageChanged() {
+        guard let language = languageButton.selectedItem?.representedObject as? String else { return }
+        Copy.preference = language
+        applyLanguage()
+        focusWord()
+        guard let request = serviceRequest(
+            path: "/api/settings/language",
+            method: "POST",
+            payload: ["language": language]
+        ) else { return }
+        Task {
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                let http = response as? HTTPURLResponse
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                guard http?.statusCode == 200, json?["ok"] as? Bool == true else {
+                    throw NSError(
+                        domain: "Wordflow",
+                        code: http?.statusCode ?? -1,
+                        userInfo: [NSLocalizedDescriptionKey: Copy.text("语言设置未保存", "Could not save the language")]
+                    )
+                }
+            } catch {
+                showStatus(shortMessage(for: error), color: .systemRed, clearAfter: 10)
+            }
+        }
+    }
+
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         guard control === wordField else { return false }
         if commandSelector == #selector(NSResponder.moveDown(_:)) || commandSelector == #selector(NSResponder.insertTab(_:)) {
@@ -629,23 +862,54 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         return false
     }
 
+    func controlTextDidBeginEditing(_ notification: Notification) {
+        guard notification.object as? NSTextField === wordField else { return }
+        wordSurface.isFocused = true
+        contextSurface.isFocused = false
+        if let editor = wordField.currentEditor() as? NSTextView {
+            applyTextBranding(to: editor)
+        }
+    }
+
+    func controlTextDidEndEditing(_ notification: Notification) {
+        guard notification.object as? NSTextField === wordField else { return }
+        wordSurface.isFocused = false
+    }
+
     @objc private func addClicked() {
         let modifiers = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
         submit(returnAfterSave: modifiers.contains(.command))
     }
 
     @objc private func pinClicked() {
-        applyPin(pinButton.state == .on)
+        togglePin()
     }
 
     private func togglePin() {
         applyPin(window.level != .floating)
     }
 
+    private func updatePinAppearance() {
+        let pinned = window.level == .floating
+        let symbol = pinned ? "pin.fill" : "pin"
+        let description = Copy.text(
+            pinned ? "已置顶" : "未置顶",
+            pinned ? "Pinned" : "Not pinned"
+        )
+        let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+        pinButton.image = NSImage(
+            systemSymbolName: symbol,
+            accessibilityDescription: description
+        )?.withSymbolConfiguration(configuration)
+        pinButton.contentTintColor = pinned ? Brand.primary : .secondaryLabelColor
+        pinButton.setAccessibilityValue(description)
+    }
+
     private func applyPin(_ pinned: Bool) {
         window.level = pinned ? .floating : .normal
         window.collectionBehavior = pinned ? [.canJoinAllSpaces, .fullScreenAuxiliary] : []
-        pinButton.state = pinned ? .on : .off
+        pinButton.state = .off
+        updatePinAppearance()
         defaults.set(pinned, forKey: "windowPinned")
     }
 
@@ -739,6 +1003,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         wordField.isEnabled = enabled
         contextView.isEditable = enabled
         addButton.isEnabled = enabled
+        languageButton.isEnabled = enabled
     }
 }
 

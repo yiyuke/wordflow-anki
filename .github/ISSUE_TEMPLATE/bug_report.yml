@@ -1,0 +1,68 @@
+name: Bug report
+description: Report something that is not working as expected
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Wordflow. Never include an OpenAI API key or private Anki content.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+      placeholder: I expected… but Wordflow…
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open…
+        2. Capture…
+        3. See…
+    validations:
+      required: true
+  - type: input
+    id: wordflow
+    attributes:
+      label: Wordflow version
+      placeholder: e.g. 0.7.1
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include macOS, Arc/Chrome, Anki, and AnkiConnect versions when relevant.
+      placeholder: macOS 15; Arc 1.x; Anki 25.x; AnkiConnect 6
+    validations:
+      required: true
+  - type: dropdown
+    id: entry
+    attributes:
+      label: Where did it happen?
+      options:
+        - Browser selection
+        - Native Quick Add window
+        - Browser fallback page
+        - Anki card or Browse
+        - Installation or update
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots or redacted logs
+      description: Remove API keys, private text, browsing history, and personal Anki content first.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed API keys and private information from this report.
+          required: true
