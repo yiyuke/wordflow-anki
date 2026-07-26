@@ -4,7 +4,7 @@
 
 <h1 align="center">Wordflow</h1>
 
-<p align="center"><strong>别背别人的词表。记住你真正遇见的词。</strong></p>
+<p align="center"><strong>记住你真正遇见的生词。</strong></p>
 <p align="center">收集 → 理解 → 复习 → 使用</p>
 
 <p align="center">
@@ -20,24 +20,26 @@
 
 ---
 
-## Anki 决定什么时候复习，Wordflow 决定复习什么
+## 用Anki复习，用Wordflow录入
 
-[Anki](https://apps.ankiweb.net/) 是一款基于“间隔重复”的记忆工具。它会在你快要忘记时再次出题，帮助知识逐渐进入长期记忆。
+[Anki](https://apps.ankiweb.net/) 是一款基于“间隔重复”的记忆工具，它设置好复习单词卡片的次数和循环，帮助长期记忆。
 
-Anki 很擅长复习，但制作一张好词卡仍然很慢。Wordflow 让你选中或输入一个词，结合原句理解它，生成紧凑的学习卡片，然后直接送进 Anki。
+Anki 适合用来复习，但仍需手动录入每一个单词卡片。
+
+Wordflow 支持选中或输入一个词，结合原句理解它，生成紧凑的学习卡片，直接送进 Anki。
 
 ```text
-遇见一个词 → 捕捉一次 → 在遗忘前复习 → 最后真正会用
+遇见一个词 → 捕捉一次 → 通过循环复习机制 → 最后真正会用
 ```
 
-我们相信，这是记单词最好的方式：不是背一张与自己无关的词表，而是在真实语境中遇见、理解，在正确的时间复习，直到能够使用。
+我认为最好的记忆单词的方法：不是背一张陌生的单词表，而是在真实语境中遇见、理解，在正确的时间复习，直到能够使用。
 
-## 它为什么不一样
+## Wordflow的优点
 
-- **保留真实语境，而不只是孤立释义。** 原句和来源会和单词一起留下。
-- **解释会适应词语本身。** 单词、习语、短语动词和抽象概念不会套用同一个模板。
-- **几乎不打断阅读。** 网页选词右键，或从任何 App 按 `Option + Shift + W`。
-- **双向主动回忆。** 每条 Note 自动生成“看词识义”和“看义回忆”两张卡。
+- **保留真实语境，不孤立释义。** 录入单词时可以同时录入原文语境，并由此生成词卡。
+- **量身定制每个词卡。** AI会为不同类型的单词、短语或固定搭配设计最适合记忆的内容。
+- **几乎不打断阅读。** 网页选词右键，或按 `Option + Shift + W`打开添加生词窗口。
+- **双向主动回忆。** 每次录入自动生成“看词识义”和“看义回忆”两张卡，正反巩固生词。
 
 每张卡会包含发音、清楚的释义、2–3 个常用搭配、1–2 个易复用例句，以及一段专门为这个词设计的简短学习说明。
 
@@ -53,8 +55,6 @@ Anki 很擅长复习，但制作一张好词卡仍然很慢。Wordflow 让你选
 git clone https://github.com/yiyuke/wordflow-anki.git
 cd wordflow-anki
 ```
-
-普通用户不需要 Fork。只有准备修改代码或参与贡献时才需要 Fork。
 
 ### 2. 安装 AnkiConnect
 
@@ -89,9 +89,11 @@ cd wordflow-anki
 
 ## 隐私与费用
 
-Wordflow 没有账号、广告、数据分析或开发者运营的服务器。词语和有限的上下文会从你的 Mac 直接发送到 OpenAI API，生成的卡片保存在你自己的 Anki 中。
+Wordflow 没有账号、广告、数据分析或开发者运营的服务器。
 
-每一份安装都使用用户自己的 OpenAI API Key，并支付自己的 API 用量。Key 保存在 macOS 钥匙串中，不会包含在公开仓库里。详细说明见 [PRIVACY.md](PRIVACY.md) 和 [SECURITY.md](SECURITY.md)。
+词语和有限的上下文会从你的 Mac 直接发送到 OpenAI API，生成的卡片保存在你自己的 Anki 中。
+
+每一份安装都使用用户自己的 OpenAI API Key，并支付自己的 API 用量。详细说明见 [PRIVACY.md](PRIVACY.md) 和 [SECURITY.md](SECURITY.md)。
 
 <details>
 <summary><strong>Wordflow 如何工作</strong></summary>
