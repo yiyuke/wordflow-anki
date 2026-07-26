@@ -6,16 +6,16 @@ Everything here is ready to copy, adjust, and publish. Keep the launch personal 
 
 1. Merge the public-release pull request into `main`.
 2. Run the tests on `main` and install that exact revision locally.
-3. Create GitHub Release `v0.7.1` with the release notes below. Attach the packaged extension ZIP in addition to GitHub's automatic source archives.
+3. Create GitHub Release `v0.8.0` with the release notes below. Attach the packaged extension ZIP in addition to GitHub's automatic source archives.
 4. Record one silent 8–15 second demo: select a word → use the shortcut → show the resulting Anki card.
 5. Publish on X/Twitter first, then publish a more personal Chinese version on Xiaohongshu.
 6. Ask for a very specific response: installation problems, one missing card field, or one workflow that still feels slow.
-7. After the first testers succeed, prepare the Chrome Web Store listing. GitHub remains the source/documentation home; the store becomes the convenient installation channel.
+7. Submit the prepared Chrome Web Store package using [`CHROME_WEB_STORE.md`](CHROME_WEB_STORE.md). GitHub remains the source/documentation home; the store becomes the convenient installation channel.
 
 ## 2. GitHub Release
 
-**Tag:** `v0.7.1`
-**Title:** `Wordflow 0.7 — Catch a word before it slips away`
+**Tag:** `v0.8.0`
+**Title:** `Wordflow 0.8 — Catch a word before it slips away`
 
 ```markdown
 Vocabulary books can feel detached from real life. Words found in novels, videos, articles, and podcasts feel meaningful, but often disappear before they become something reviewable. Anki can schedule the review, yet making every note by hand is slow and inconsistent.

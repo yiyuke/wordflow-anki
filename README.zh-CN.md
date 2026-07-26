@@ -147,12 +147,11 @@ Wordflow 只监听 `127.0.0.1`。严格的 JSON Schema 控制卡片长度和结�
 ```bash
 python3 -m unittest discover -s local_service/tests -v
 node --check extension/service-worker.js
-node --check extension/content.js
 node --check extension/popup.js
 native/build-app.sh
 ```
 
-更多信息见 [CONTRIBUTING.md](CONTRIBUTING.md)、[CHANGELOG.md](CHANGELOG.md)和[发布工具包](docs/LAUNCH.md)。
+更多信息见 [CONTRIBUTING.md](CONTRIBUTING.md)、[CHANGELOG.md](CHANGELOG.md)、[发布工具包](docs/LAUNCH.md)和 [Chrome Web Store 提交工具包](docs/CHROME_WEB_STORE.md)。
 
 </details>
 

@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import struct
 import sys
 import tempfile
 import unittest
@@ -77,6 +78,55 @@ class WordflowTests(unittest.TestCase):
         self.assertTrue(is_valid_client_header("wordflow-local"))
         self.assertFalse(is_valid_client_header(""))
         self.assertFalse(is_valid_client_header("browser"))
+
+    def test_store_manifest_uses_on_demand_page_access(self):
+        extension_dir = SERVICE_DIR.parent / "extension"
+        manifest = json.loads((extension_dir / "manifest.json").read_text(encoding="utf-8"))
+        worker = (extension_dir / "service-worker.js").read_text(encoding="utf-8")
+        self.assertEqual(manifest["version"], "0.8.0")
+        self.assertEqual(
+            set(manifest["permissions"]),
+            {"contextMenus", "storage", "activeTab", "scripting"},
+        )
+        self.assertNotIn("tabs", manifest["permissions"])
+        self.assertNotIn("content_scripts", manifest)
+        self.assertNotIn("<all_urls>", json.dumps(manifest))
+        self.assertEqual(
+            manifest["host_permissions"],
+            ["http://127.0.0.1:8766/*", "http://localhost:8766/*"],
+        )
+        self.assertFalse((extension_dir / "content.js").exists())
+        self.assertIn("chrome.scripting.executeScript", worker)
+        self.assertIn("func: readSelectionContext", worker)
+        self.assertIn("func: renderResultToast", worker)
+
+    def test_store_submission_kit_has_privacy_copy_review_mode_and_exact_assets(self):
+        root = SERVICE_DIR.parent
+        privacy = (root / "PRIVACY.md").read_text(encoding="utf-8")
+        submission = (root / "docs" / "CHROME_WEB_STORE.md").read_text(encoding="utf-8")
+        review_mode = root / "scripts" / "start-review-mode.command"
+        self.assertIn("Limited Use requirements", privacy)
+        self.assertIn("activeTab", privacy)
+        self.assertIn("scripting", privacy)
+        self.assertIn("Single purpose", submission)
+        self.assertIn("Permission justifications", submission)
+        self.assertIn("Reviewer test instructions", submission)
+        self.assertIn("MOCK_OPENAI=1", review_mode.read_text(encoding="utf-8"))
+        self.assertTrue(review_mode.stat().st_mode & 0o111)
+
+        expected_sizes = {
+            "icon-128.png": (128, 128),
+            "small-promo-440x280.png": (440, 280),
+            "marquee-promo-1400x560.png": (1400, 560),
+            "screenshot-capture-en-1280x800.png": (1280, 800),
+            "screenshot-capture-zh-1280x800.png": (1280, 800),
+            "screenshot-quick-add-en-1280x800.png": (1280, 800),
+            "screenshot-quick-add-zh-1280x800.png": (1280, 800),
+        }
+        for filename, expected in expected_sizes.items():
+            data = (root / "assets" / "chrome-web-store" / filename).read_bytes()
+            self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(struct.unpack(">II", data[16:24]), expected)
 
     def test_browser_fallback_uses_accessible_below_trigger_dropdowns(self):
         extension_dir = SERVICE_DIR.parent / "extension"

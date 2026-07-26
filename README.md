@@ -147,12 +147,11 @@ To update, run `git pull`, run `install.command` again, and reload the extension
 ```bash
 python3 -m unittest discover -s local_service/tests -v
 node --check extension/service-worker.js
-node --check extension/content.js
 node --check extension/popup.js
 native/build-app.sh
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), and the [launch kit](docs/LAUNCH.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), the [launch kit](docs/LAUNCH.md), and the [Chrome Web Store submission kit](docs/CHROME_WEB_STORE.md).
 
 </details>
 

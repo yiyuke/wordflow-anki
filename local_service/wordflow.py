@@ -942,7 +942,7 @@ class WordflowApp:
         return {
             "ok": True,
             "service": "wordflow-to-anki",
-            "version": "0.7.1",
+            "version": "0.8.0",
             "openai_configured": bool(self.config.openai_api_key) or self.config.mock_openai,
             "model": self.config.openai_model,
             "deck": self.preferences.default_deck(self.config.deck_name),

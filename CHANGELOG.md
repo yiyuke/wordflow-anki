@@ -2,6 +2,15 @@
 
 All notable changes to Wordflow are documented here.
 
+## 0.8.0 — 2026-07-26
+
+- Replaced the always-on `<all_urls>` content script with temporary `activeTab` access and packaged on-demand scripts.
+- Removed the broad `tabs` permission while preserving context capture, keyboard shortcuts, and result toasts.
+- Added a bilingual Chrome Web Store privacy and Limited Use disclosure.
+- Added a credential-free local review mode, complete submission copy, permission justifications, and reviewer test instructions.
+- Added exact-size Chrome Web Store listing assets and a validated `0.8.0` extension package.
+- Made a copyable, terminal-agent installation prompt the primary bilingual onboarding path while keeping the complete manual steps available in a collapsed section.
+
 ## 0.7.1 — 2026-07-26
 
 - Increased the top breathing room on the browser fallback page.
@@ -10,7 +19,6 @@ All notable changes to Wordflow are documented here.
 - Unified the native Quick Add button, caret, focus border, selected text, shortcut label, Pin, and native menu accent around the Wordflow green palette while keeping success feedback brighter.
 - Softened the text-selection wash and native focus border so the green state remains visible without competing with the content.
 - Shortened the bilingual README around one clear idea: Anki schedules the review, and Wordflow creates the right material to review.
-- Made a copyable, terminal-agent installation prompt the primary bilingual onboarding path while keeping the complete manual steps available in a collapsed section.
 
 ## 0.7.0 — 2026-07-26
 

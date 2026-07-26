@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "__MSG_extensionDescription__",
   "default_locale": "en",
-  "permissions": ["contextMenus", "storage", "activeTab", "tabs"],
+  "permissions": ["contextMenus", "storage", "activeTab", "scripting"],
   "host_permissions": [
     "http://127.0.0.1:8766/*",
     "http://localhost:8766/*"
   ],
+  "homepage_url": "https://github.com/yiyuke/wordflow-anki",
   "background": {
     "service_worker": "service-worker.js"
   },
@@ -40,13 +41,5 @@
       },
       "description": "__MSG_commandCaptureDescription__"
     }
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle",
-      "all_frames": true
-    }
-  ]
+  }
 }

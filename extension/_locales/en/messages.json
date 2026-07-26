@@ -1,6 +1,6 @@
 {
   "extensionName": { "message": "Wordflow to Anki" },
-  "extensionDescription": { "message": "Turn new English words into rich, review-ready Anki cards." },
+  "extensionDescription": { "message": "Turn selected English words and phrases into context-aware Anki cards." },
   "actionTitle": { "message": "Open Wordflow Quick Add" },
   "commandManualDescription": { "message": "Open the manual word input" },
   "commandCaptureDescription": { "message": "Add the selected word to Anki" },

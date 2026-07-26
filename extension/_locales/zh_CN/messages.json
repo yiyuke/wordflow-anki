@@ -1,6 +1,6 @@
 {
   "extensionName": { "message": "Wordflow to Anki" },
-  "extensionDescription": { "message": "把遇到的英文生词变成内容丰富、可以直接复习的 Anki 卡片。" },
+  "extensionDescription": { "message": "把选中的英文单词和短语变成保留语境、可以直接复习的 Anki 卡片。" },
   "actionTitle": { "message": "打开 Wordflow 快速添加" },
   "commandManualDescription": { "message": "打开手动输入窗口" },
   "commandCaptureDescription": { "message": "把选中的单词加入 Anki" },
