@@ -12,6 +12,12 @@
 </p>
 
 <p align="center">
+  <a href="https://chromewebstore.google.com/detail/wordflow-to-anki/digeekdaafggpmdaojgmpjkdbbkgkiga"><strong>Install from Chrome Web Store</strong></a>
+  ·
+  <a href="https://www.youtube.com/watch?v=ySq3NDcvDcQ"><strong>Watch the 38-second demo</strong></a>
+</p>
+
+<p align="center">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-12%2B-111827?logo=apple">
   <img alt="Arc and Chrome" src="https://img.shields.io/badge/Arc%20%2F%20Chrome-Chromium-067647?logo=googlechrome">
   <img alt="Anki" src="https://img.shields.io/badge/Anki-AnkiConnect-2563eb">
@@ -43,64 +49,91 @@ I believe the best way to remember vocabulary is not to memorize an unfamiliar l
 
 Wordflow adds pronunciation, a clear meaning, 2–3 useful collocations, 1–2 reusable examples, and one short learning note designed for that particular expression.
 
+## See the whole learning loop
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="https://www.youtube.com/watch?v=ySq3NDcvDcQ">
+        <img src="assets/demo-capture.jpg" alt="Capture a word and create Anki cards with Wordflow" width="100%">
+      </a>
+      <br>
+      <strong>1. Capture and understand</strong><br>
+      Select a word, keep its context, and turn it into two review-ready cards.
+    </td>
+    <td width="50%" align="center">
+      <a href="https://www.youtube.com/watch?v=SslXMoeeIzc">
+        <img src="assets/demo-review.jpg" alt="Review Wordflow cards in Anki" width="100%">
+      </a>
+      <br>
+      <strong>2. Review and recall</strong><br>
+      Let Anki schedule the cards until recognition becomes active recall.
+    </td>
+  </tr>
+</table>
+
 ## Install
 
-> Wordflow is currently an early macOS release. It requires Anki, AnkiConnect, a Chromium browser, Python 3, and your own OpenAI API key. The browser extension is loaded manually until a Chrome Web Store version is available.
+> Wordflow is an early macOS release. It requires Anki, AnkiConnect, Chrome or Arc, Python 3, and your own OpenAI API key. The extension is available from the Chrome Web Store; a small local companion connects it to Anki on your Mac.
 
-### Recommended: let a local AI coding agent install it
+### 1. Install the browser extension
+
+[**Install Wordflow from the Chrome Web Store →**](https://chromewebstore.google.com/detail/wordflow-to-anki/digeekdaafggpmdaojgmpjkdbbkgkiga)
+
+The same listing works in both Chrome and Arc.
+
+### 2. Install Anki and AnkiConnect
+
+1. Install and open [Anki](https://apps.ankiweb.net/).
+2. Open **Tools → Add-ons → Get Add-ons**.
+3. Enter `2055492159`, then restart Anki.
+
+### 3. Install the local companion
+
+#### Recommended: let a local AI coding agent install it
 
 If you use Codex, Claude Code, or another AI coding agent with terminal access to your Mac, copy the entire prompt below. A chat-only AI cannot install local software for you.
 
 ```text
-Please install Wordflow on this Mac:
+Please install the Wordflow local companion on this Mac:
 https://github.com/yiyuke/wordflow-anki
 
 Before making changes, read README.md and install.command so you understand what will be installed.
 Use or update the main branch, run the repository's installer, and verify that:
 1. the local Wordflow service is running on 127.0.0.1:8766;
 2. the native Quick Add window opens;
-3. the browser extension has been copied to the correct installation folder.
+3. the Chrome Web Store extension can connect to the local service.
 
+Use the Chrome Web Store version of the extension. Do not load the extension from source unless I explicitly ask for a development installation.
 Do not ask me to fork the repository, and do not ask me to paste my OpenAI API key into the chat.
 Pause only for steps that I must complete myself, and give me clear step-by-step instructions:
 - install or open Anki and add AnkiConnect (code: 2055492159);
+- install the Wordflow extension from https://chromewebstore.google.com/detail/wordflow-to-anki/digeekdaafggpmdaojgmpjkdbbkgkiga;
 - paste my own OpenAI API key into the hidden local terminal prompt so it is stored in macOS Keychain;
-- confirm loading the extension in Arc / Chrome or approve a macOS security prompt.
+- approve a macOS security prompt if one appears.
 
-When finished, test Option + Shift + W and tell me whether anything still requires manual action.
+When finished, test Option + Shift + W and Option + Shift + A, then tell me whether anything still requires manual action.
 ```
 
 > Never paste your API key directly into an AI chat. Wordflow's configuration script accepts it through a hidden local prompt and stores it in macOS Keychain.
 
 <details>
-<summary><strong>Prefer not to use AI? Show the manual installation steps</strong></summary>
+<summary><strong>Prefer not to use AI? Install the local companion manually</strong></summary>
 
-### 1. Download
+### Download the source
 
-There is not yet a tagged release. For the current preview:
+There is not yet a tagged local-companion release. For the current version:
 
 ```bash
 git clone https://github.com/yiyuke/wordflow-anki.git
 cd wordflow-anki
 ```
 
-### 2. Install AnkiConnect
-
-1. Install and open [Anki](https://apps.ankiweb.net/).
-2. Open **Tools → Add-ons → Get Add-ons**.
-3. Enter `2055492159`, then restart Anki.
-
-### 3. Install Wordflow
+### Run the installer
 
 1. Double-click `install.command`.
 2. Double-click the installed `configure-api-key.command` and paste your [OpenAI API key](https://platform.openai.com/api-keys).
 3. If macOS blocks a script, Control-click it, choose **Open**, and confirm once.
-
-### 4. Load the browser extension
-
-1. Open `arc://extensions` or `chrome://extensions`.
-2. Enable **Developer mode** and choose **Load unpacked**.
-3. Select `~/Library/Application Support/Wordflow/extension`.
 
 </details>
 
@@ -142,7 +175,9 @@ Wordflow listens only on `127.0.0.1`. A strict JSON Schema keeps cards compact w
 <details>
 <summary><strong>Update, uninstall, and development</strong></summary>
 
-To update, run `git pull`, run `install.command` again, and reload the extension. To uninstall, double-click `uninstall.command`; existing Anki cards remain untouched.
+The Chrome Web Store updates the browser extension automatically. To update the local companion, run `git pull` and run `install.command` again. To uninstall it, double-click `uninstall.command`; existing Anki cards remain untouched.
+
+For extension development, open `arc://extensions` or `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the repository's `extension` folder.
 
 ```bash
 python3 -m unittest discover -s local_service/tests -v

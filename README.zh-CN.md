@@ -12,6 +12,12 @@
 </p>
 
 <p align="center">
+  <a href="https://chromewebstore.google.com/detail/wordflow-to-anki/digeekdaafggpmdaojgmpjkdbbkgkiga"><strong>从 Chrome 应用商店安装</strong></a>
+  ·
+  <a href="https://www.youtube.com/watch?v=ySq3NDcvDcQ"><strong>观看 38 秒演示</strong></a>
+</p>
+
+<p align="center">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-12%2B-111827?logo=apple">
   <img alt="Arc and Chrome" src="https://img.shields.io/badge/Arc%20%2F%20Chrome-Chromium-067647?logo=googlechrome">
   <img alt="Anki" src="https://img.shields.io/badge/Anki-AnkiConnect-2563eb">
@@ -43,64 +49,91 @@ Wordflow 支持选中或输入一个词，结合原句理解它，生成紧凑�
 
 每张卡会包含发音、清楚的释义、2–3 个常用搭配、1–2 个易复用例句，以及一段专门为这个词设计的简短学习说明。
 
+## 看完整的学习闭环
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="https://www.youtube.com/watch?v=ySq3NDcvDcQ">
+        <img src="assets/demo-capture.jpg" alt="用 Wordflow 收集单词并生成 Anki 卡片" width="100%">
+      </a>
+      <br>
+      <strong>1. 收集与理解</strong><br>
+      选中单词、保留语境，自动生成两张可以直接复习的卡片。
+    </td>
+    <td width="50%" align="center">
+      <a href="https://www.youtube.com/watch?v=SslXMoeeIzc">
+        <img src="assets/demo-review.jpg" alt="在 Anki 中复习 Wordflow 卡片" width="100%">
+      </a>
+      <br>
+      <strong>2. 复习与回忆</strong><br>
+      让 Anki 安排复习，直到“见词认识”变成“主动想起”。
+    </td>
+  </tr>
+</table>
+
 ## 安装
 
-> Wordflow 目前是一个早期 macOS 版本。需要 Anki、AnkiConnect、Chromium 浏览器、Python 3 和用户自己的 OpenAI API Key。在 Chrome Web Store 版本发布前，浏览器扩展需要手动加载。
+> Wordflow 目前是一个早期 macOS 版本。需要 Anki、AnkiConnect、Chrome 或 Arc、Python 3 和用户自己的 OpenAI API Key。浏览器扩展已经上架 Chrome 应用商店；一个很小的本地服务负责在你的 Mac 上连接扩展和 Anki。
 
-### 推荐：交给本地 AI 编程助手安装
+### 1. 安装浏览器扩展
+
+[**从 Chrome 应用商店安装 Wordflow →**](https://chromewebstore.google.com/detail/wordflow-to-anki/digeekdaafggpmdaojgmpjkdbbkgkiga)
+
+同一个商店页面同时适用于 Chrome 和 Arc。
+
+### 2. 安装 Anki 和 AnkiConnect
+
+1. 安装并打开 [Anki](https://apps.ankiweb.net/)。
+2. 进入 **Tools → Add-ons → Get Add-ons**。
+3. 输入 `2055492159`，然后重启 Anki。
+
+### 3. 安装 Wordflow 本地服务
+
+#### 推荐：交给本地 AI 编程助手安装
 
 如果你使用能够访问这台 Mac 终端的 Codex、Claude Code 或其他 AI 编程助手，复制下面整段 Prompt 给它即可。普通聊天机器人无法直接操作本地电脑。
 
 ```text
-请帮我在这台 Mac 上安装 Wordflow：
+请帮我在这台 Mac 上安装 Wordflow 本地服务：
 https://github.com/yiyuke/wordflow-anki
 
 开始前，请先阅读 README.zh-CN.md 和 install.command，确认安装内容。
 请从 main 分支下载或更新项目，运行项目自带的安装程序，并验证：
 1. Wordflow 本地服务在 127.0.0.1:8766 正常运行；
 2. 原生 Quick Add 窗口可以打开；
-3. 浏览器扩展已经复制到正确的安装目录。
+3. 从 Chrome 应用商店安装的扩展可以连接本地服务。
 
+请使用 Chrome 应用商店版本；除非我明确要求开发版，否则不要从源代码加载浏览器扩展。
 不要让我 Fork 仓库，也不要让我把 OpenAI API Key 发到聊天里。
 只有遇到以下必须由我完成的步骤时才暂停，并给出清楚、逐步的指引：
 - 安装或打开 Anki，并在 Anki 中安装 AnkiConnect（代码：2055492159）；
+- 从 https://chromewebstore.google.com/detail/wordflow-to-anki/digeekdaafggpmdaojgmpjkdbbkgkiga 安装 Wordflow 扩展；
 - 在本地终端的隐藏输入提示中粘贴我自己的 OpenAI API Key，让它保存到 macOS 钥匙串；
-- 在 Arc / Chrome 中确认加载扩展，或处理 macOS 的安全确认。
+- 处理可能出现的 macOS 安全确认。
 
-完成后，请测试 Option + Shift + W，并告诉我是否还有需要手动完成的事情。
+完成后，请测试 Option + Shift + W 和 Option + Shift + A，并告诉我是否还有需要手动完成的事情。
 ```
 
 > 不要把 API Key 直接粘贴给 AI。Wordflow 自带的配置脚本会在本地隐藏输入，并把 Key 保存到 macOS 钥匙串。
 
 <details>
-<summary><strong>不使用 AI，查看传统安装步骤</strong></summary>
+<summary><strong>不使用 AI，手动安装本地服务</strong></summary>
 
-### 1. 下载
+### 下载源代码
 
-目前还没有正式带版本号的 Release。测试当前版本可运行：
+目前还没有单独发布带版本号的本地服务安装包，可以使用当前版本：
 
 ```bash
 git clone https://github.com/yiyuke/wordflow-anki.git
 cd wordflow-anki
 ```
 
-### 2. 安装 AnkiConnect
-
-1. 安装并打开 [Anki](https://apps.ankiweb.net/)。
-2. 进入 **Tools → Add-ons → Get Add-ons**。
-3. 输入 `2055492159`，然后重启 Anki。
-
-### 3. 安装 Wordflow
+### 运行安装程序
 
 1. 双击 `install.command`。
 2. 双击安装后的 `configure-api-key.command`，粘贴自己的 [OpenAI API Key](https://platform.openai.com/api-keys)。
 3. 如果 macOS 阻止脚本运行，请按住 Control 点击文件，选择 **打开**，再确认一次。
-
-### 4. 加载浏览器扩展
-
-1. 打开 `arc://extensions` 或 `chrome://extensions`。
-2. 开启 **Developer mode**，选择 **Load unpacked / 加载已解压的扩展程序**。
-3. 选择 `~/Library/Application Support/Wordflow/extension`。
 
 </details>
 
@@ -142,7 +175,9 @@ Wordflow 只监听 `127.0.0.1`。严格的 JSON Schema 控制卡片长度和结�
 <details>
 <summary><strong>更新、卸载与开发</strong></summary>
 
-更新时运行 `git pull`，重新运行 `install.command`，再重新加载扩展。卸载时双击 `uninstall.command`；已有 Anki 卡片不会被删除。
+Chrome 应用商店会自动更新浏览器扩展。更新本地服务时运行 `git pull`，再重新运行 `install.command`。卸载时双击 `uninstall.command`；已有 Anki 卡片不会被删除。
+
+如果要开发扩展，请打开 `arc://extensions` 或 `chrome://extensions`，开启 **Developer mode**，选择 **Load unpacked / 加载已解压的扩展程序**，然后选择仓库中的 `extension` 文件夹。
 
 ```bash
 python3 -m unittest discover -s local_service/tests -v
