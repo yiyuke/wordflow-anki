@@ -1,10 +1,10 @@
 # Wordflow Privacy / 隐私说明
 
-Last updated / 最后更新：2026-07-26
+Last updated / 最后更新：2026-08-27
 
 ## English
 
-Wordflow is a local, open-source bridge between your browser, the OpenAI API, and Anki. It has no Wordflow account, advertising, analytics, telemetry, or developer-operated backend.
+Wordflow is a local, open-source bridge between your browser, the OpenAI API, and Anki. It has no Wordflow account, advertising, analytics, or telemetry. The optional feedback form uses Formspree only when you explicitly submit feedback.
 
 ### Single purpose and Limited Use
 
@@ -44,11 +44,17 @@ Wordflow does not monitor browsing, read pages in the background, or build a bro
 
 Wordflow does not sell personal data. The project author does not receive the captured words, API key, browsing history, or Anki collection.
 
-General questions can be opened through [GitHub Issues](https://github.com/yiyuke/wordflow-anki/issues). Report sensitive security problems privately according to [SECURITY.md](SECURITY.md).
+### Optional feedback form
+
+The macOS Quick Add window includes an optional feedback form. When you click **Submit Feedback**, Wordflow sends the feedback type and message you entered to Formspree over HTTPS. Formspree stores the submission in the project inbox and delivers a notification to the project author. No email app or user contact address is required.
+
+Wordflow's submission contains only the category and message you enter. It never automatically attaches captured words, API keys, browsing history, Anki content, screenshots, logs, your email address, the Wordflow version, or macOS details. Formspree may process network metadata such as an IP address as described in its [Privacy Policy](https://formspree.io/legal/privacy-policy/). Do not include sensitive personal information in feedback.
+
+General questions can be sent through this in-app form or opened through [GitHub Issues](https://github.com/yiyuke/wordflow-anki/issues). Report sensitive security problems privately according to [SECURITY.md](SECURITY.md).
 
 ## 中文
 
-Wordflow 是浏览器、OpenAI API 与 Anki 之间的本地开源桥梁。它没有 Wordflow 账号、广告、数据分析、遥测或由开发者运营的后端服务器。
+Wordflow 是浏览器、OpenAI API 与 Anki 之间的本地开源桥梁。它没有 Wordflow 账号、广告、数据分析或遥测。只有当用户主动提交反馈时，可选反馈表单才会使用 Formspree。
 
 ### 单一用途与 Limited Use
 
@@ -88,4 +94,10 @@ Wordflow 不会监控浏览行为，不会在后台读取网页，也不会建�
 
 Wordflow 不出售个人数据。项目作者不会收到你捕捉的单词、API Key、浏览历史或 Anki 数据库。
 
-一般问题可以通过 [GitHub Issues](https://github.com/yiyuke/wordflow-anki/issues) 提交。涉及敏感信息的安全问题，请按照 [SECURITY.md](SECURITY.md) 私下报告。
+### 可选的反馈表单
+
+macOS 快速窗口提供一个可选的反馈表单。当用户点击**提交反馈**时，Wordflow 会通过 HTTPS 将用户填写的反馈类型和问题描述发送给 Formspree。Formspree 将提交保存在项目收件箱中，并向项目作者发送通知；用户不需要打开邮件 App，也不需要提供邮箱。
+
+Wordflow 主动提交的内容只有用户填写的反馈类型和问题描述，不会自动附加生词、API Key、浏览记录、Anki 内容、截图、日志、用户邮箱、Wordflow 版本或 macOS 信息。Formspree 可能会按照其[隐私政策](https://formspree.io/legal/privacy-policy/)处理 IP 地址等网络元数据。请不要在反馈中填写敏感个人信息。
+
+一般问题可以通过应用内表单发送，也可以通过 [GitHub Issues](https://github.com/yiyuke/wordflow-anki/issues) 提交。涉及敏感信息的安全问题，请按照 [SECURITY.md](SECURITY.md) 私下报告。

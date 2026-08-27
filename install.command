@@ -6,6 +6,8 @@ DEST="$HOME/Library/Application Support/Wordflow"
 LOG_DIR="$HOME/Library/Logs/Wordflow"
 AGENT="$HOME/Library/LaunchAgents/com.wordflow.to-anki.plist"
 TEMPLATE="$ROOT/macos/com.wordflow.to-anki.plist"
+QUICK_AGENT="$HOME/Library/LaunchAgents/com.wordflow.quick-add.plist"
+QUICK_TEMPLATE="$ROOT/macos/com.wordflow.quick-add.plist"
 
 IS_ZH=0
 case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
@@ -26,6 +28,11 @@ fi
 PYTHON="$(command -v python3)"
 mkdir -p "$DEST" "$LOG_DIR" "$(dirname "$AGENT")"
 
+# Stop the always-on quick window before replacing its app bundle. KeepAlive
+# would otherwise restart it midway through the build and lock bundle files.
+/bin/launchctl bootout "gui/$(id -u)/com.wordflow.quick-add" 2>/dev/null || true
+/usr/bin/killall WordflowQuickAdd 2>/dev/null || true
+
 /usr/bin/ditto "$ROOT/local_service" "$DEST/local_service"
 /usr/bin/ditto "$ROOT/extension" "$DEST/extension"
 /usr/bin/ditto "$ROOT/macos" "$DEST/macos"
@@ -33,7 +40,6 @@ mkdir -p "$DEST" "$LOG_DIR" "$(dirname "$AGENT")"
 /bin/cp "$ROOT/configure-api-key.command" "$DEST/configure-api-key.command"
 
 if command -v swiftc >/dev/null 2>&1; then
-  /usr/bin/killall WordflowQuickAdd 2>/dev/null || true
   "$ROOT/native/build-app.sh" "$DEST" >/dev/null
 else
   say "提示：未找到 Swift 编译器，将使用浏览器备用窗口。" \
@@ -53,6 +59,9 @@ SERVICE_ESCAPED="$(escape_sed "$DEST/local_service/server.py")"
 WORKDIR_ESCAPED="$(escape_sed "$DEST/local_service")"
 LOG_OUT_ESCAPED="$(escape_sed "$LOG_DIR/service.log")"
 LOG_ERR_ESCAPED="$(escape_sed "$LOG_DIR/service-error.log")"
+QUICK_BINARY_ESCAPED="$(escape_sed "$DEST/Wordflow Quick Add.app/Contents/MacOS/WordflowQuickAdd")"
+QUICK_LOG_OUT_ESCAPED="$(escape_sed "$LOG_DIR/quick-add.log")"
+QUICK_LOG_ERR_ESCAPED="$(escape_sed "$LOG_DIR/quick-add-error.log")"
 
 /usr/bin/sed \
   -e "s|__PYTHON__|$PYTHON_ESCAPED|g" \
@@ -62,9 +71,23 @@ LOG_ERR_ESCAPED="$(escape_sed "$LOG_DIR/service-error.log")"
   -e "s|__LOG_ERR__|$LOG_ERR_ESCAPED|g" \
   "$TEMPLATE" > "$AGENT"
 
+if [[ -x "$DEST/Wordflow Quick Add.app/Contents/MacOS/WordflowQuickAdd" ]]; then
+  /usr/bin/sed \
+    -e "s|__QUICK_ADD_BINARY__|$QUICK_BINARY_ESCAPED|g" \
+    -e "s|__QUICK_ADD_LOG_OUT__|$QUICK_LOG_OUT_ESCAPED|g" \
+    -e "s|__QUICK_ADD_LOG_ERR__|$QUICK_LOG_ERR_ESCAPED|g" \
+    "$QUICK_TEMPLATE" > "$QUICK_AGENT"
+else
+  /bin/rm -f "$QUICK_AGENT"
+fi
+
 /bin/launchctl bootout "gui/$(id -u)/com.wordflow.to-anki" 2>/dev/null || true
 /bin/launchctl bootstrap "gui/$(id -u)" "$AGENT"
 /bin/launchctl kickstart -k "gui/$(id -u)/com.wordflow.to-anki"
+if [[ -f "$QUICK_AGENT" ]]; then
+  /bin/launchctl bootstrap "gui/$(id -u)" "$QUICK_AGENT"
+  /bin/launchctl kickstart -k "gui/$(id -u)/com.wordflow.quick-add"
+fi
 
 echo
 say "Wordflow 本地服务安装完成。" "Wordflow's local service is installed."

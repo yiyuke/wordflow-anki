@@ -47,7 +47,7 @@ I believe the best way to remember vocabulary is not to memorize an unfamiliar l
 - **Almost no interruption.** Select and right-click, or press `Option + Shift + W` to open Quick Add.
 - **Active recall in both directions.** Every capture creates both recognition and production cards.
 
-Wordflow adds pronunciation, a clear meaning, 2–3 useful collocations, 1–2 reusable examples, and one short learning note designed for that particular expression.
+Choose the card that matches your goal. **Full Learning** adds pronunciation, a clear meaning, 2–3 useful collocations, 1–2 reusable examples, and one compact learning note. **Exam Reading** keeps only the exact Chinese meaning of the word in its sentence, so you can move through reading material quickly without an overloaded card.
 
 ## See the whole learning loop
 
@@ -142,17 +142,22 @@ cd wordflow-anki
 | What you want to do | Action |
 | --- | --- |
 | Capture selected text in Arc or Chrome | Right-click **Add to Anki**, or press `Option + Shift + A` |
-| Type a word from a PDF, Word, video, or podcast | Press `Option + Shift + W` |
+| Type a word from a PDF, Word, video, or podcast | Press the system-wide `Option + Shift + W` |
+| Switch between detailed study and exam reading | Open the title-bar gear → **Learning Mode** |
 | Choose an Anki deck | Press `Command + D` in Quick Add |
 | Save and keep typing | Press `Enter` |
 | Save and return to the previous app | Press `Command + Enter` |
 | Pin or close Quick Add | Press `Command + P` or `Esc` |
 
-Choose `Auto / 中文 / English` in Quick Add to change both the interface and the explanation language. New cards start in `Vocabulary Inbox`; Wordflow remembers later deck choices.
+The title-bar gear keeps learning mode, language, and the complete shortcut reference in one place. Wordflow remembers your choices. New cards start in `Vocabulary Inbox`; later deck choices are remembered too.
+
+If Anki is not running when you save, Wordflow opens it in the background, waits for AnkiConnect, and safely completes the addition.
+
+The question-mark button at the right of the macOS title bar opens an in-app feedback form, the project home, and a manual update check. Choose a feedback type, describe the issue, and submit it directly—no email app or contact details required. When a newer version is available, the button becomes a highlighted download button.
 
 ## Privacy and cost
 
-Wordflow has no account, analytics, advertising, or developer-operated server.
+Wordflow has no account, analytics, or advertising. Its optional feedback form uses Formspree to deliver only the type and description you choose to submit.
 
 Your word and limited context go directly from your Mac to the OpenAI API; the finished card stays in your Anki collection.
 

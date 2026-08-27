@@ -18,6 +18,7 @@ from wordflow import (  # noqa: E402
     AnkiClient,
     CARD_TEMPLATES,
     CARD_CSS,
+    card_schema,
     Config,
     LEGACY_RECOGNITION_BACK,
     OpenAICardGenerator,
@@ -31,6 +32,7 @@ from wordflow import (  # noqa: E402
     keychain_secret,
     normalize_card,
     normalize_deck_name,
+    normalize_learning_mode,
     normalize_capture,
 )
 from server import is_allowed_origin, is_valid_client_header, signal_quick_add_window  # noqa: E402
@@ -83,7 +85,7 @@ class WordflowTests(unittest.TestCase):
         extension_dir = SERVICE_DIR.parent / "extension"
         manifest = json.loads((extension_dir / "manifest.json").read_text(encoding="utf-8"))
         worker = (extension_dir / "service-worker.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.8.0")
+        self.assertEqual(manifest["version"], "0.9.0")
         self.assertEqual(
             set(manifest["permissions"]),
             {"contextMenus", "storage", "activeTab", "scripting"},
@@ -133,8 +135,8 @@ class WordflowTests(unittest.TestCase):
         markup = (extension_dir / "popup.html").read_text(encoding="utf-8")
         styling = (extension_dir / "popup.css").read_text(encoding="utf-8")
         script = (extension_dir / "popup.js").read_text(encoding="utf-8")
-        self.assertEqual(markup.count('role="combobox"'), 2)
-        self.assertEqual(markup.count('role="listbox"'), 2)
+        self.assertEqual(markup.count('role="combobox"'), 3)
+        self.assertEqual(markup.count('role="listbox"'), 3)
         self.assertIn("top: calc(100% + 7px)", styling)
         self.assertIn("position: absolute", styling)
         self.assertIn("input:focus-visible", styling)
@@ -145,6 +147,7 @@ class WordflowTests(unittest.TestCase):
         self.assertNotIn("#175cd3", styling)
         self.assertNotIn("#eff4ff", styling)
         self.assertIn('setupSelect("language")', script)
+        self.assertIn('setupSelect("learning-mode")', script)
         self.assertIn('setupSelect("deck")', script)
 
     def test_native_quick_add_uses_brand_green_without_changing_success_green(self):
@@ -154,6 +157,34 @@ class WordflowTests(unittest.TestCase):
         self.assertIn(".backgroundColor: Brand.selectionBackground", source)
         self.assertIn("pinButton.contentTintColor = pinned ? Brand.primary", source)
         self.assertIn("pinButton.setButtonType(.momentaryChange)", source)
+        self.assertIn('"learning_mode": learningMode', source)
+        self.assertIn("RegisterEventHotKey", source)
+        self.assertIn("UInt32(optionKey | shiftKey)", source)
+        self.assertIn('CommandLine.arguments.contains("--background")', source)
+        self.assertIn('settingsButton.setAccessibilityLabel(Copy.text("设置", "Settings"))', source)
+        self.assertIn('identifier: "updateButton"', source)
+        self.assertIn("accessory.layoutAttribute = .right", source)
+        self.assertIn('Copy.text("学习模式", "Learning Mode")', source)
+        self.assertIn('Copy.text("语言", "Language")', source)
+        self.assertIn('Copy.text("键盘快捷键", "Keyboard Shortcuts")', source)
+        self.assertNotIn("subtitleLabel", source)
+        self.assertNotIn("hintLabel", source)
+        self.assertNotIn("learningModeButton", source)
+        self.assertNotIn("languageButton", source)
+        self.assertIn('"arrow.down.circle.fill"', source)
+        self.assertIn('"questionmark.circle"', source)
+        self.assertIn("raw.githubusercontent.com/yiyuke/wordflow-anki/main/extension/manifest.json", source)
+        self.assertIn('feedbackEndpoint = URL(string: "https://formspree.io/f/xbgjrpbq")!', source)
+        self.assertIn('Copy.text("提交反馈", "Submit Feedback")', source)
+        self.assertIn('"type": category', source)
+        self.assertIn('"message": message', source)
+        self.assertIn("sendButton.bezelColor = Brand.primary", source)
+        self.assertNotIn('mail.scheme = "mailto"', source)
+        self.assertNotIn("feedbackEmail", source)
+        self.assertNotIn("Your email (optional)", source)
+        self.assertNotIn("No GitHub account is needed", source)
+        self.assertNotIn("operatingSystemVersionString", source)
+        self.assertNotIn("github.com/yiyuke/wordflow-anki/issues/new", source)
         self.assertIn("Brand.primary.withAlphaComponent(isDark ? 0.9 : 0.62)", source)
         self.assertIn("layer?.borderWidth = 1", source)
         self.assertIn("color: success ? .systemGreen : .systemRed", source)
@@ -163,6 +194,16 @@ class WordflowTests(unittest.TestCase):
         self.assertIn("<key>NSAccentColorName</key>", info)
         self.assertIn("<string>AccentColor</string>", info)
         self.assertIn("xcrun actool", build_script)
+        self.assertIn("xcrun --find actool", build_script)
+        self.assertIn("skipping optional asset catalog compilation", build_script)
+        self.assertIn('/bin/cp -X "$ROOT/Wordflow.icns"', build_script)
+        self.assertIn("-framework Carbon", build_script)
+        installer = (SERVICE_DIR.parent / "install.command").read_text(encoding="utf-8")
+        quick_agent = (SERVICE_DIR.parent / "macos" / "com.wordflow.quick-add.plist").read_text(encoding="utf-8")
+        self.assertIn("com.wordflow.quick-add", installer)
+        self.assertIn("bootout", installer)
+        self.assertIn("__QUICK_ADD_BINARY__", quick_agent)
+        self.assertIn("--background", quick_agent)
 
     def test_running_quick_window_is_signalled_instead_of_reopened(self):
         with patch("server.subprocess.run") as process, patch("server.os.kill") as kill:
@@ -208,6 +249,15 @@ class WordflowTests(unittest.TestCase):
         self.assertEqual(capture["language"], "en")
         fallback = normalize_capture({"text": "lucid", "language": "unsupported"})
         self.assertEqual(fallback["language"], "zh")
+
+    def test_capture_accepts_learning_modes(self):
+        self.assertEqual(normalize_learning_mode("full"), "full")
+        self.assertEqual(normalize_capture({"text": "lucid"})["learning_mode"], "full")
+        exam = normalize_capture({"text": "lucid", "language": "en", "learning_mode": "exam"})
+        self.assertEqual(exam["learning_mode"], "exam")
+        self.assertEqual(exam["language"], "zh")
+        with self.assertRaises(ValueError):
+            normalize_learning_mode("verbose")
 
     def test_empty_and_long_selection_are_rejected(self):
         with self.assertRaises(ValueError):
@@ -289,6 +339,16 @@ class WordflowTests(unittest.TestCase):
             self.assertEqual(restored.settings()["language"], "en")
             with self.assertRaises(ValueError):
                 app.select_language({"language": "unsupported"})
+
+    def test_learning_mode_is_persisted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            preferences = Path(directory) / "preferences.json"
+            app = WordflowApp(mock_config(), preferences_path=preferences)
+            self.assertEqual(app.settings()["learning_mode"], "full")
+            selected = app.select_learning_mode({"learning_mode": "exam"})
+            self.assertEqual(selected["learning_mode"], "exam")
+            restored = WordflowApp(mock_config(), preferences_path=preferences)
+            self.assertEqual(restored.settings()["learning_mode"], "exam")
 
     def test_multiword_capture_keeps_the_complete_phrase(self):
         capture = normalize_capture(
@@ -459,6 +519,50 @@ class WordflowTests(unittest.TestCase):
         self.assertIn("Adapt learning_note", payload["input"][0]["content"])
         user_input = json.loads(payload["input"][1]["content"])
         self.assertEqual(user_input["explanation_language"], "en")
+        self.assertEqual(user_input["learning_mode"], "full")
+
+    def test_exam_mode_generates_only_contextual_meaning(self):
+        capture = normalize_capture({
+            "text": "bear",
+            "context": "These findings bear directly on the question.",
+            "language": "zh",
+            "learning_mode": "exam",
+        })
+        card = {
+            "word": "bear",
+            "lemma": "bear",
+            "pronunciation": "/ber/",
+            "part_of_speech": "verb",
+            "meaning_zh": "与……直接相关",
+            "definition_en": "",
+            "context": capture["context"],
+            "context_cloze": "These findings […] directly on the question.",
+            "collocations": [],
+            "learning_note": "",
+            "examples": [],
+            "tags": ["verb"],
+        }
+        response = {
+            "output": [{
+                "type": "message",
+                "content": [{"type": "output_text", "text": json.dumps(card)}],
+            }]
+        }
+        config = replace(mock_config(), mock_openai=False, openai_api_key="test-key")
+        with patch("wordflow._request_json", return_value=response) as request_json:
+            generated = OpenAICardGenerator(config).generate(capture)
+        payload = request_json.call_args.args[1]
+        schema = payload["text"]["format"]["schema"]
+        self.assertEqual(payload["max_output_tokens"], 500)
+        self.assertEqual(schema["properties"]["collocations"]["maxItems"], 0)
+        self.assertEqual(schema["properties"]["examples"]["maxItems"], 0)
+        self.assertIn("exact sense used in the supplied sentence", payload["input"][0]["content"])
+        self.assertEqual(generated["meaning_zh"], "与……直接相关")
+        self.assertEqual(generated["definition_en"], "")
+        self.assertEqual(generated["learning_note"], "")
+        self.assertEqual(generated["collocations"], [])
+        self.assertEqual(generated["examples"], [])
+        self.assertEqual(card_schema("full")["properties"]["examples"]["minItems"], 1)
 
     def test_normalization_caps_repetition_and_content_counts(self):
         capture = normalize_capture(
@@ -524,13 +628,61 @@ class WordflowTests(unittest.TestCase):
         with (
             patch("wordflow.sys.platform", "darwin"),
             patch("wordflow._request_json", side_effect=responses) as request_json,
-            patch("wordflow.subprocess.Popen") as launch,
+            patch("wordflow.subprocess.run", return_value=MagicMock(returncode=0)) as launch,
             patch("wordflow.time.sleep") as sleep,
         ):
             self.assertEqual(client.invoke("deckNames"), ["Default"])
         launch.assert_called_once()
+        self.assertEqual(launch.call_args.args[0], ["/usr/bin/open", "-g", "-a", "Anki"])
         sleep.assert_called_once_with(0.5)
         self.assertEqual(request_json.call_count, 3)
+
+    def test_add_note_disconnect_recovers_without_blind_duplicate(self):
+        client = AnkiClient(replace(mock_config(), mock_anki=False))
+        client.ensure_model = lambda _deck=None: None
+        actions = []
+
+        def invoke(action, **_params):
+            actions.append(action)
+            if action == "findNotes":
+                return [] if actions.count("findNotes") == 1 else [321]
+            if action == "addNote":
+                raise RuntimeError("Anki 未连接")
+            if action == "notesInfo":
+                return [{"cards": [654]}]
+            if action == "cardsInfo":
+                return [{"deckName": "Test Deck"}]
+            raise AssertionError(action)
+
+        client.invoke = invoke
+        client._launch_anki_and_wait = lambda: True
+        result = client.add_card(
+            {
+                "word": "bear",
+                "lemma": "bear",
+                "pronunciation": "/ber/",
+                "part_of_speech": "verb",
+                "meaning_zh": "与……相关",
+                "definition_en": "",
+                "context": "These findings bear on the question.",
+                "context_cloze": "These findings […] on the question.",
+                "collocations": [],
+                "learning_note": "",
+                "examples": [],
+                "tags": [],
+            },
+            {
+                "source_type": "test",
+                "source_title": "Test",
+                "source_url": "",
+                "language": "zh",
+                "learning_mode": "exam",
+            },
+            deck_name="Test Deck",
+        )
+        self.assertTrue(result["recovered"])
+        self.assertEqual(result["note_id"], 321)
+        self.assertEqual(actions.count("addNote"), 1)
 
     def test_anki_requests_explicitly_bypass_system_proxy(self):
         client = AnkiClient(replace(mock_config(), mock_anki=False))

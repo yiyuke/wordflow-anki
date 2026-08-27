@@ -1,6 +1,7 @@
 const MENU_ID = "wordflow-add-to-anki";
 const DEFAULT_SERVICE_URL = "http://127.0.0.1:8766";
 let languagePreference = "auto";
+let learningMode = "full";
 let messageCatalog = {};
 let contextMenuInstall = Promise.resolve();
 
@@ -79,7 +80,8 @@ chrome.runtime.onStartup.addListener(() => refreshContextMenu());
 async function settings() {
   return chrome.storage.sync.get({
     serviceUrl: DEFAULT_SERVICE_URL,
-    languagePreference: "auto"
+    languagePreference: "auto",
+    learningMode: "full"
   });
 }
 
@@ -88,6 +90,9 @@ async function loadLanguagePreference() {
   if (["auto", "zh", "en"].includes(saved.languagePreference)) {
     languagePreference = saved.languagePreference;
   }
+  if (["full", "exam"].includes(saved.learningMode)) {
+    learningMode = saved.learningMode;
+  }
   try {
     const response = await fetch(`${saved.serviceUrl.replace(/\/$/, "")}/api/settings`, {
       headers: { "X-Wordflow-Client": "wordflow-local" }
@@ -95,8 +100,11 @@ async function loadLanguagePreference() {
     const data = await response.json();
     if (response.ok && data.ok && ["auto", "zh", "en"].includes(data.language)) {
       languagePreference = data.language;
-      await chrome.storage.sync.set({ languagePreference });
     }
+    if (response.ok && data.ok && ["full", "exam"].includes(data.learning_mode)) {
+      learningMode = data.learning_mode;
+    }
+    await chrome.storage.sync.set({ languagePreference, learningMode });
   } catch (_error) {
     // The browser's saved or automatic language remains available offline.
   }
@@ -189,6 +197,7 @@ async function capture(payload, tabId) {
   await loadLanguagePreference();
   await loadMessageCatalog();
   payload.language = languageCode();
+  payload.learning_mode = learningMode;
   const { serviceUrl } = await settings();
   try {
     const response = await fetch(`${serviceUrl.replace(/\/$/, "")}/api/capture`, {
@@ -264,6 +273,9 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "LANGUAGE_CHANGED" && ["auto", "zh", "en"].includes(message.language)) {
     languagePreference = message.language;
     loadMessageCatalog().then(installContextMenu);
+  }
+  if (message?.type === "LEARNING_MODE_CHANGED" && ["full", "exam"].includes(message.learningMode)) {
+    learningMode = message.learningMode;
   }
 });
 
