@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import getpass
 import hashlib
 import html
@@ -191,6 +192,19 @@ class Preferences:
             self._data["language"] = normalized
             self._save()
 
+    def learning_mode(self) -> str:
+        with self._lock:
+            value = str(self._data.get("learning_mode", "full")).strip().lower()
+            return value if value in {"full", "exam"} else "full"
+
+    def set_learning_mode(self, learning_mode: str) -> None:
+        normalized = normalize_learning_mode(learning_mode)
+        with self._lock:
+            if self._data.get("learning_mode") == normalized:
+                return
+            self._data["learning_mode"] = normalized
+            self._save()
+
 
 def normalize_deck_name(value: Any) -> str:
     deck_name = re.sub(r"\s+", " ", str(value or "")).strip()
@@ -199,6 +213,13 @@ def normalize_deck_name(value: Any) -> str:
     if len(deck_name) > 200:
         raise ValueError("牌组名称过长")
     return deck_name
+
+
+def normalize_learning_mode(value: Any) -> str:
+    learning_mode = str(value or "full").strip().lower()
+    if learning_mode not in {"full", "exam"}:
+        raise ValueError("学习模式必须是 full 或 exam")
+    return learning_mode
 
 
 CARD_SCHEMA: Dict[str, Any] = {
@@ -245,6 +266,16 @@ CARD_SCHEMA: Dict[str, Any] = {
 }
 
 
+def card_schema(learning_mode: str) -> Dict[str, Any]:
+    schema = copy.deepcopy(CARD_SCHEMA)
+    if learning_mode == "exam":
+        schema["properties"]["collocations"]["minItems"] = 0
+        schema["properties"]["collocations"]["maxItems"] = 0
+        schema["properties"]["examples"]["minItems"] = 0
+        schema["properties"]["examples"]["maxItems"] = 0
+    return schema
+
+
 # Runtime generation policy sent directly to the OpenAI Responses API.
 # Wordflow does not execute Codex SKILL.md files when a user captures a word.
 SYSTEM_PROMPT = """You create compact, trustworthy English vocabulary cards for a language learner.
@@ -282,6 +313,19 @@ def explanation_instructions(language: str) -> str:
     return """The learner's explanation language is Simplified Chinese.
 - meaning_zh must be a concise Simplified Chinese meaning.
 - Write learning_note in concise, natural Simplified Chinese, targeting roughly 45-120 Chinese characters."""
+
+
+def learning_mode_instructions(learning_mode: str) -> str:
+    if learning_mode == "exam":
+        return """The learner selected Exam Reading mode for Chinese postgraduate entrance-exam reading.
+- Optimize for fast recognition of the exact sense used in the supplied sentence, not broad word mastery.
+- meaning_zh must be one precise, compact Simplified Chinese gloss for this context. Do not list unrelated senses.
+- Keep pronunciation and part_of_speech accurate because they support identification.
+- Set definition_en and learning_note to empty strings.
+- Return empty arrays for collocations and examples.
+- Do not add etymology, mnemonic imagery, usage expansion, synonyms, or extra teaching commentary."""
+    return """The learner selected Full Learning mode.
+- Follow the adaptive explanation, collocation, and example rules above so the card supports long-term understanding and active use."""
 
 
 def _request_json(
@@ -363,6 +407,13 @@ def normalize_capture(payload: Dict[str, Any]) -> Dict[str, str]:
     language = str(payload.get("language") or os.getenv("WORDFLOW_CARD_LANGUAGE", "zh")).strip().lower()
     if language not in {"zh", "en"}:
         language = "zh"
+    learning_mode = normalize_learning_mode(
+        payload.get("learning_mode") or os.getenv("WORDFLOW_LEARNING_MODE", "full")
+    )
+    if learning_mode == "exam":
+        # This preset exists specifically for Chinese exam reading, regardless
+        # of the interface language chosen by the user.
+        language = "zh"
     return {
         "text": text,
         "context": re.sub(r"\s+", " ", str(payload.get("context", ""))).strip()[:3000],
@@ -370,6 +421,7 @@ def normalize_capture(payload: Dict[str, Any]) -> Dict[str, str]:
         "source_url": str(payload.get("source_url", "")).strip()[:2000],
         "source_type": str(payload.get("source_type", "unknown")).strip()[:60] or "unknown",
         "language": language,
+        "learning_mode": learning_mode,
     }
 
 
@@ -379,7 +431,7 @@ def mock_card(capture: Dict[str, str]) -> Dict[str, Any]:
     is_english = capture.get("language") == "en"
     pattern = re.compile(re.escape(word), re.IGNORECASE)
     cloze = pattern.sub("[… ]".replace(" ", ""), context, count=1) if context else ""
-    return {
+    card = {
         "word": word,
         "lemma": word.lower(),
         "pronunciation": "/mock/",
@@ -397,6 +449,15 @@ def mock_card(capture: Dict[str, str]) -> Dict[str, Any]:
         "examples": [f"This example uses {word} naturally."],
         "tags": ["mock", "english"],
     }
+    if capture.get("learning_mode") == "exam":
+        card.update({
+            "definition_en": "",
+            "collocations": [],
+            "learning_note": "",
+            "examples": [],
+            "tags": ["mock", "exam-reading"],
+        })
+    return card
 
 
 class OpenAICardGenerator:
@@ -416,7 +477,11 @@ class OpenAICardGenerator:
             "input": [
                 {
                     "role": "system",
-                    "content": f"{SYSTEM_PROMPT}\n{explanation_instructions(capture['language'])}",
+                    "content": (
+                        f"{SYSTEM_PROMPT}\n"
+                        f"{explanation_instructions(capture['language'])}\n"
+                        f"{learning_mode_instructions(capture['learning_mode'])}"
+                    ),
                 },
                 {
                     "role": "user",
@@ -426,6 +491,7 @@ class OpenAICardGenerator:
                             "context": capture["context"],
                             "source_title": capture["source_title"],
                             "explanation_language": capture["language"],
+                            "learning_mode": capture["learning_mode"],
                         },
                         ensure_ascii=False,
                     ),
@@ -436,10 +502,10 @@ class OpenAICardGenerator:
                     "type": "json_schema",
                     "name": "vocabulary_card",
                     "strict": True,
-                    "schema": CARD_SCHEMA,
+                    "schema": card_schema(capture["learning_mode"]),
                 }
             },
-            "max_output_tokens": 1100,
+            "max_output_tokens": 500 if capture["learning_mode"] == "exam" else 1100,
         }
         response = _request_json(
             f"{self.config.openai_base_url}/responses",
@@ -518,6 +584,11 @@ def normalize_card(card: Dict[str, Any], capture: Dict[str, str]) -> Dict[str, A
             normalized["context_cloze"] = exact_cloze
         elif not normalized["context_cloze"]:
             normalized["context_cloze"] = ""
+    if capture.get("learning_mode") == "exam":
+        normalized["definition_en"] = ""
+        normalized["learning_note"] = ""
+        normalized["collocations"] = []
+        normalized["examples"] = []
     return normalized
 
 
@@ -575,6 +646,10 @@ CARD_CSS = """/* wordflow-managed:3 */
 .example { color: var(--wf-text) !important; font-style: italic; }
 .example + .example { margin-top: 5px; }
 .collocations { margin-top: 12px; color: var(--wf-muted) !important; font-size: 15px; }
+.definition:empty,
+.learning-note:empty,
+.examples:empty,
+.collocations:empty { display: none; }
 .collocation { color: var(--wf-muted) !important; }
 .collocation + .collocation::before { content: " · "; color: var(--wf-muted) !important; }
 .section { margin-top: 16px; color: var(--wf-text) !important; }
@@ -658,19 +733,24 @@ class AnkiClient:
             return False
         with self._launch_lock:
             try:
-                subprocess.Popen(
-                    ["/usr/bin/open", "-g", "-b", "net.ankiweb.launcher"],
+                launched = subprocess.run(
+                    ["/usr/bin/open", "-g", "-a", "Anki"],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    start_new_session=True,
+                    check=False,
+                    timeout=8,
                 )
-            except OSError:
+            except (OSError, subprocess.SubprocessError):
+                return False
+            if launched.returncode != 0:
                 return False
 
             payload: Dict[str, Any] = {"action": "version", "version": 6, "params": {}}
             if self.config.anki_api_key:
                 payload["key"] = self.config.anki_api_key
-            for _ in range(20):
+            # Large collections and add-on initialization can make a cold Anki
+            # launch noticeably slower than the app window appearing.
+            for _ in range(60):
                 time.sleep(0.5)
                 try:
                     response = _request_json(
@@ -712,7 +792,7 @@ class AnkiClient:
         except RuntimeError as error:
             if safe_to_retry and str(error) == "Anki 未连接":
                 if not self._launch_anki_and_wait():
-                    raise RuntimeError("Anki 启动失败，请手动打开") from error
+                    raise RuntimeError("AnkiConnect 未就绪，请确认 Anki 和 AnkiConnect 已安装") from error
                 response = _request_json(
                     self.config.anki_url,
                     payload,
@@ -855,6 +935,7 @@ class AnkiClient:
             }
 
         tags = ["wordflow", dedupe_tag]
+        tags.append(f"mode-{capture.get('learning_mode', 'full')}")
         source_tag = safe_tag(capture["source_type"])
         if source_tag:
             tags.append(f"source-{source_tag}")
@@ -897,7 +978,25 @@ class AnkiClient:
                     "fields": ["Audio"],
                 }
             ]
-        note_id = self.invoke("addNote", note=note)
+        try:
+            note_id = self.invoke("addNote", note=note)
+        except RuntimeError as error:
+            if str(error) != "Anki 未连接":
+                raise
+            # addNote is not blindly retried: the first request may have reached
+            # Anki before its response was lost. Relaunch, check the identity tag,
+            # and only write again when no note was created.
+            if not self._launch_anki_and_wait():
+                raise RuntimeError("AnkiConnect 未就绪，请确认 Anki 和 AnkiConnect 已安装") from error
+            recovered = self.invoke("findNotes", query=f"tag:{dedupe_tag}")
+            if recovered:
+                return {
+                    "duplicate": False,
+                    "note_id": recovered[0],
+                    "deck": self.note_deck(recovered[0]) or target_deck,
+                    "recovered": True,
+                }
+            note_id = self.invoke("addNote", note=note)
         return {"duplicate": False, "note_id": note_id, "deck": target_deck}
 
 
@@ -932,17 +1031,24 @@ class WordflowApp:
         return {"ok": True, "selected": deck_name, "stale": available["stale"]}
 
     def settings(self) -> Dict[str, Any]:
-        return {"language": self.preferences.language()}
+        return {
+            "language": self.preferences.language(),
+            "learning_mode": self.preferences.learning_mode(),
+        }
 
     def select_language(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         self.preferences.set_language(payload.get("language", ""))
         return {"ok": True, "language": self.preferences.language()}
 
+    def select_learning_mode(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        self.preferences.set_learning_mode(payload.get("learning_mode", ""))
+        return {"ok": True, "learning_mode": self.preferences.learning_mode()}
+
     def health(self) -> Dict[str, Any]:
         return {
             "ok": True,
             "service": "wordflow-to-anki",
-            "version": "0.8.0",
+            "version": "0.9.0",
             "openai_configured": bool(self.config.openai_api_key) or self.config.mock_openai,
             "model": self.config.openai_model,
             "deck": self.preferences.default_deck(self.config.deck_name),
@@ -951,6 +1057,8 @@ class WordflowApp:
         }
 
     def generate(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(payload)
+        payload.setdefault("learning_mode", self.preferences.learning_mode())
         capture = normalize_capture(payload)
         return {"capture": capture, "card": self.generator.generate(capture)}
 

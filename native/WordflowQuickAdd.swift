@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Darwin
 import Foundation
 
@@ -156,7 +157,7 @@ private final class ContextTextView: NSTextView {
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTextFieldDelegate {
     private let defaults = UserDefaults.standard
-    private let defaultContentSize = NSSize(width: 468, height: 379)
+    private let defaultContentSize = NSSize(width: 468, height: 361)
     private var window: QuickAddWindow!
     private var wordField: NSTextField!
     private var contextView: ContextTextView!
@@ -165,16 +166,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var deckButton: NSPopUpButton!
     private var addButton: NSButton!
     private var pinButton: NSButton!
-    private var languageButton: NSPopUpButton!
+    private var settingsButton: NSButton!
+    private var updateButton: NSButton!
+    private var titlebarAccessory: NSTitlebarAccessoryViewController?
     private var statusLabel: NSTextField!
     private var progress: NSProgressIndicator!
     private var titleLabel: NSTextField!
-    private var subtitleLabel: NSTextField!
     private var wordLabel: NSTextField!
     private var deckLabel: NSTextField!
     private var contextLabel: NSTextField!
-    private var hintLabel: NSTextField!
     private var keyMonitor: Any?
+    private var globalHotKeyRef: EventHotKeyRef?
+    private var globalHotKeyHandler: EventHandlerRef?
     private var showSignalSource: DispatchSourceSignal?
     private var previousApplication: NSRunningApplication?
     private var availableDecks: [String] = []
@@ -183,18 +186,36 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var isLoadingDecks = false
     private var isLoadingLanguage = false
     private var isSubmitting = false
+    private var learningMode = "full"
+    private var updateAvailable = false
+    private let latestManifestURL = URL(
+        string: "https://raw.githubusercontent.com/yiyuke/wordflow-anki/main/extension/manifest.json"
+    )!
+    private let updatePageURL = URL(string: "https://github.com/yiyuke/wordflow-anki#install")!
+    private let feedbackEndpoint = URL(string: "https://formspree.io/f/xbgjrpbq")!
+    private let projectURL = URL(string: "https://github.com/yiyuke/wordflow-anki")!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         buildWindow()
         installKeyboardMonitor()
+        installGlobalHotKey()
         installShowSignalHandler()
-        showWindow()
+        checkForUpdates()
+        if !CommandLine.arguments.contains("--background") {
+            showWindow()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)
+        }
+        if let globalHotKeyRef {
+            UnregisterEventHotKey(globalHotKeyRef)
+        }
+        if let globalHotKeyHandler {
+            RemoveEventHandler(globalHotKeyHandler)
         }
         showSignalSource?.cancel()
         removePIDFile()
@@ -230,17 +251,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         window.pinHandler = { [weak self] in self?.togglePin() }
         window.closeHandler = { [weak self] in self?.hideWindow() }
         window.selectAllHandler = { [weak self] in self?.selectAllInFocusedInput() ?? false }
+        installTitlebarControls()
 
         let content = NSView()
         content.translatesAutoresizingMaskIntoConstraints = false
         window.contentView = content
 
         titleLabel = label(Copy.text("快速添加到 Anki", "Quick Add to Anki"), size: 21, weight: .bold, color: .labelColor)
-        subtitleLabel = label(Copy.text("打开窗口：⌥⇧W", "Open window: ⌥⇧W"), size: 13, weight: .semibold, color: Brand.primary)
-        let titleStack = NSStackView(views: [titleLabel, subtitleLabel])
-        titleStack.orientation = .vertical
-        titleStack.alignment = .leading
-        titleStack.spacing = 3
 
         pinButton = NSButton(
             image: NSImage(systemSymbolName: "pin", accessibilityDescription: nil) ?? NSImage(),
@@ -256,21 +273,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         pinButton.widthAnchor.constraint(equalToConstant: 32).isActive = true
         pinButton.heightAnchor.constraint(equalToConstant: 28).isActive = true
 
-        languageButton = NSPopUpButton(frame: .zero, pullsDown: false)
-        languageButton.controlSize = .small
-        languageButton.font = .systemFont(ofSize: 12, weight: .medium)
-        languageButton.target = self
-        languageButton.action = #selector(languageChanged)
-        languageButton.setAccessibilityIdentifier("languageButton")
-        languageButton.widthAnchor.constraint(equalToConstant: 82).isActive = true
-        configureLanguageButton()
-
         let headerSpacer = NSView()
         headerSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let header = NSStackView(views: [titleStack, headerSpacer, languageButton, pinButton])
+        let header = NSStackView(views: [titleLabel, headerSpacer, pinButton])
         header.orientation = .horizontal
         header.alignment = .centerY
-        header.spacing = 12
+        header.spacing = 10
 
         wordLabel = label(Copy.text("单词或短语", "Word or phrase"), size: 14, weight: .semibold, color: .labelColor)
         let wordHeaderSpacer = NSView()
@@ -284,8 +292,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         deckButton.setAccessibilityIdentifier("deckButton")
         deckButton.setAccessibilityLabel(Copy.text("保存到 Anki 牌组", "Save to Anki deck"))
         deckButton.toolTip = Copy.text(
-            "这里列出 Anki 中的真实牌组，并记住上次选择",
-            "Lists your actual Anki decks and remembers the last choice"
+            "选择 Anki 牌组（⌘D），并记住上次选择",
+            "Choose an Anki deck (⌘D); the last choice is remembered"
         )
         deckButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 164).isActive = true
         deckButton.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
@@ -326,6 +334,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         contextView.isAutomaticQuoteSubstitutionEnabled = false
         contextView.isAutomaticDashSubstitutionEnabled = false
         contextView.textContainerInset = NSSize(width: 10, height: 9)
+        contextView.toolTip = Copy.text("Tab 或 ↓ 移动到这里", "Move here with Tab or ↓")
         contextView.setAccessibilityLabel(Copy.text("例句或上下文，可选", "Example or context, optional"))
         contextView.setAccessibilityIdentifier("contextField")
         contextView.focusWordHandler = { [weak self] in self?.focusWord() }
@@ -373,10 +382,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         statusRow.detachesHiddenViews = true
         statusRow.heightAnchor.constraint(equalToConstant: 18).isActive = true
 
-        hintLabel = label(Copy.text(
-            "↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存切回 · Esc 关闭",
-            "Tab move · ⌘D deck · ⌘↩ return · Esc close"
-        ), size: 12, weight: .medium, color: .secondaryLabelColor)
         addButton = NSButton(title: Copy.text("加入 Anki", "Add to Anki"), target: self, action: #selector(addClicked))
         addButton.bezelStyle = .rounded
         addButton.bezelColor = Brand.primary
@@ -386,11 +391,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         addButton.keyEquivalent = "\r"
         addButton.keyEquivalentModifierMask = [.command]
         addButton.setAccessibilityIdentifier("addButton")
+        addButton.toolTip = Copy.text("⌘↩ 保存并切回之前的 App", "⌘↩ Save and return to the previous app")
         addButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 112).isActive = true
 
         let footerSpacer = NSView()
         footerSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let footer = NSStackView(views: [hintLabel, footerSpacer, addButton])
+        let footer = NSStackView(views: [footerSpacer, addButton])
         footer.orientation = .horizontal
         footer.alignment = .centerY
         footer.spacing = 12
@@ -429,6 +435,52 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         applyLanguage()
     }
 
+    private func installTitlebarControls() {
+        settingsButton = titlebarButton(
+            symbol: "gearshape",
+            identifier: "settingsButton",
+            action: #selector(settingsButtonClicked)
+        )
+        updateButton = titlebarButton(
+            symbol: "questionmark.circle",
+            identifier: "updateButton",
+            action: #selector(updateButtonClicked)
+        )
+
+        let controls = NSStackView(views: [settingsButton, updateButton])
+        controls.orientation = .horizontal
+        controls.alignment = .centerY
+        controls.spacing = 4
+        controls.frame = NSRect(x: 0, y: 0, width: 60, height: 28)
+        controls.autoresizingMask = [.width, .height]
+
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 68, height: 28))
+        container.addSubview(controls)
+
+        let accessory = NSTitlebarAccessoryViewController()
+        accessory.layoutAttribute = .right
+        accessory.view = container
+        window.addTitlebarAccessoryViewController(accessory)
+        titlebarAccessory = accessory
+    }
+
+    private func titlebarButton(symbol: String, identifier: String, action: Selector) -> NSButton {
+        let button = NSButton(
+            image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage(),
+            target: self,
+            action: action
+        )
+        button.setButtonType(.momentaryChange)
+        button.isBordered = false
+        button.focusRingType = .none
+        button.imagePosition = .imageOnly
+        button.imageScaling = .scaleProportionallyDown
+        button.setAccessibilityIdentifier(identifier)
+        button.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        return button
+    }
+
     private func installKeyboardMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, self.window.isVisible, event.window === self.window else {
@@ -462,6 +514,262 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             }
             return event
         }
+    }
+
+    private func installGlobalHotKey() {
+        var eventSpec = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+        let userData = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        let handlerStatus = InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, event, userData in
+                guard let event, let userData else { return OSStatus(eventNotHandledErr) }
+                var hotKeyID = EventHotKeyID()
+                let readStatus = GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+                guard readStatus == noErr, hotKeyID.id == 1 else {
+                    return OSStatus(eventNotHandledErr)
+                }
+                let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
+                DispatchQueue.main.async {
+                    delegate.showWindow()
+                }
+                return noErr
+            },
+            1,
+            &eventSpec,
+            userData,
+            &globalHotKeyHandler
+        )
+        guard handlerStatus == noErr else {
+            fputs("[wordflow] Could not install the global hotkey handler: \(handlerStatus)\n", stderr)
+            return
+        }
+
+        let hotKeyID = EventHotKeyID(signature: 0x57464C4F, id: 1) // WFLO
+        let registerStatus = RegisterEventHotKey(
+            UInt32(kVK_ANSI_W),
+            UInt32(optionKey | shiftKey),
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &globalHotKeyRef
+        )
+        if registerStatus != noErr {
+            fputs("[wordflow] Could not register Option-Shift-W: \(registerStatus)\n", stderr)
+        }
+    }
+
+    private func checkForUpdates(showResult: Bool = false) {
+        var request = URLRequest(url: latestManifestURL)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 8
+        request.setValue("Wordflow/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        Task {
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard (response as? HTTPURLResponse)?.statusCode == 200,
+                      let manifest = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let latestVersion = manifest["version"] as? String else {
+                    throw URLError(.badServerResponse)
+                }
+                updateAvailable = latestVersion.compare(currentVersion, options: .numeric) == .orderedDescending
+                updateUpdateButtonAppearance()
+                if showResult {
+                    showStatus(
+                        updateAvailable
+                            ? Copy.text("发现新版本 \(latestVersion)", "Version \(latestVersion) is available")
+                            : Copy.text("已经是最新版", "Wordflow is up to date"),
+                        color: updateAvailable ? Brand.primary : .secondaryLabelColor,
+                        clearAfter: 6
+                    )
+                }
+            } catch {
+                if showResult {
+                    showStatus(
+                        Copy.text("暂时无法检查更新", "Could not check for updates"),
+                        color: .secondaryLabelColor,
+                        clearAfter: 6
+                    )
+                }
+            }
+        }
+    }
+
+    private var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+    }
+
+    private func updateUpdateButtonAppearance() {
+        let symbol = updateAvailable ? "arrow.down.circle.fill" : "questionmark.circle"
+        updateButton.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage()
+        updateButton.contentTintColor = updateAvailable ? Brand.primary : .secondaryLabelColor
+        updateButton.toolTip = updateAvailable
+            ? Copy.text("有新版本，点击查看更新", "An update is available")
+            : Copy.text("帮助、反馈与检查更新", "Help, feedback, and updates")
+        updateButton.setAccessibilityLabel(updateButton.toolTip ?? "")
+    }
+
+    @objc private func updateButtonClicked() {
+        if updateAvailable {
+            NSWorkspace.shared.open(updatePageURL)
+            return
+        }
+        let menu = NSMenu()
+        let checkItem = NSMenuItem(
+            title: Copy.text("检查更新", "Check for Updates"),
+            action: #selector(checkForUpdatesClicked),
+            keyEquivalent: ""
+        )
+        checkItem.target = self
+        menu.addItem(checkItem)
+
+        let feedbackItem = NSMenuItem(
+            title: Copy.text("帮助与反馈", "Help & Feedback"),
+            action: #selector(openFeedback),
+            keyEquivalent: ""
+        )
+        feedbackItem.target = self
+        menu.addItem(feedbackItem)
+
+        let projectItem = NSMenuItem(
+            title: Copy.text("项目主页", "Project Home"),
+            action: #selector(openProjectHome),
+            keyEquivalent: ""
+        )
+        projectItem.target = self
+        menu.addItem(projectItem)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: updateButton.bounds.minY - 4), in: updateButton)
+    }
+
+    @objc private func checkForUpdatesClicked() {
+        checkForUpdates(showResult: true)
+    }
+
+    @objc private func openFeedback() {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = Copy.text("帮助与反馈", "Help & Feedback")
+        let sendButton = alert.addButton(withTitle: Copy.text("提交反馈", "Submit Feedback"))
+        sendButton.bezelColor = Brand.primary
+        alert.addButton(withTitle: Copy.text("取消", "Cancel"))
+
+        let category = NSPopUpButton(frame: .zero, pullsDown: false)
+        category.addItems(withTitles: [
+            Copy.text("功能建议", "Feature idea"),
+            Copy.text("遇到问题", "Problem or bug"),
+            Copy.text("安装帮助", "Installation help"),
+            Copy.text("其他", "Other"),
+        ])
+        category.setAccessibilityLabel(Copy.text("反馈类型", "Feedback type"))
+
+        let messageView = NSTextView()
+        messageView.font = .systemFont(ofSize: 13)
+        messageView.isRichText = false
+        messageView.isAutomaticQuoteSubstitutionEnabled = false
+        messageView.isAutomaticDashSubstitutionEnabled = false
+        messageView.textContainerInset = NSSize(width: 8, height: 7)
+        messageView.setAccessibilityLabel(Copy.text("反馈内容", "Feedback message"))
+        let messageScroll = NSScrollView()
+        messageScroll.borderType = .bezelBorder
+        messageScroll.hasVerticalScroller = true
+        messageScroll.autohidesScrollers = true
+        messageScroll.documentView = messageView
+        messageScroll.heightAnchor.constraint(equalToConstant: 112).isActive = true
+
+        let form = NSStackView(views: [
+            feedbackLabel(Copy.text("反馈类型", "Feedback type")),
+            category,
+            feedbackLabel(Copy.text("请告诉我发生了什么，或你希望改进什么", "What happened, or what would you improve?")),
+            messageScroll,
+        ])
+        form.orientation = .vertical
+        form.alignment = .leading
+        form.spacing = 6
+        form.translatesAutoresizingMaskIntoConstraints = false
+
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 380, height: 184))
+        accessory.addSubview(form)
+        NSLayoutConstraint.activate([
+            form.leadingAnchor.constraint(equalTo: accessory.leadingAnchor),
+            form.trailingAnchor.constraint(equalTo: accessory.trailingAnchor),
+            form.topAnchor.constraint(equalTo: accessory.topAnchor),
+            form.bottomAnchor.constraint(lessThanOrEqualTo: accessory.bottomAnchor),
+            category.widthAnchor.constraint(equalTo: form.widthAnchor),
+            messageScroll.widthAnchor.constraint(equalTo: form.widthAnchor),
+        ])
+        alert.accessoryView = accessory
+        alert.window.initialFirstResponder = messageView
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let message = messageView.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else {
+            showStatus(Copy.text("请先填写反馈内容", "Write a feedback message first"), color: .systemRed, clearAfter: 8)
+            return
+        }
+
+        let categoryName = category.titleOfSelectedItem ?? Copy.text("其他", "Other")
+        submitFeedback(category: categoryName, message: message)
+    }
+
+    private func submitFeedback(category: String, message: String) {
+        showStatus(Copy.text("正在发送反馈…", "Sending feedback…"))
+
+        Task {
+            do {
+                var request = URLRequest(url: feedbackEndpoint)
+                request.httpMethod = "POST"
+                request.timeoutInterval = 15
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: [
+                    "type": category,
+                    "message": message,
+                ])
+
+                let (_, response) = try await URLSession.shared.data(for: request)
+                guard let http = response as? HTTPURLResponse,
+                      (200..<300).contains(http.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+                showStatus(
+                    Copy.text("反馈已发送，谢谢", "Feedback sent — thank you"),
+                    color: .systemGreen,
+                    clearAfter: 10
+                )
+            } catch {
+                showStatus(
+                    Copy.text("发送失败，请稍后重试", "Could not send. Try again later"),
+                    color: .systemRed,
+                    clearAfter: 10
+                )
+            }
+        }
+    }
+
+    private func feedbackLabel(_ text: String, muted: Bool = false) -> NSTextField {
+        let field = label(
+            text,
+            size: muted ? 11 : 12,
+            weight: muted ? .regular : .semibold,
+            color: muted ? .secondaryLabelColor : .labelColor
+        )
+        field.maximumNumberOfLines = 3
+        field.lineBreakMode = .byWordWrapping
+        return field
+    }
+
+    @objc private func openProjectHome() {
+        NSWorkspace.shared.open(projectURL)
     }
 
     private func label(_ text: String, size: CGFloat, weight: NSFont.Weight, color: NSColor) -> NSTextField {
@@ -647,47 +955,98 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         return false
     }
 
-    private func configureLanguageButton() {
-        let selected = Copy.preference
-        languageButton.removeAllItems()
-        let choices = [
+    @objc private func settingsButtonClicked() {
+        let menu = NSMenu()
+
+        let modeItem = NSMenuItem(title: Copy.text("学习模式", "Learning Mode"), action: nil, keyEquivalent: "")
+        let modeMenu = NSMenu()
+        modeMenu.addItem(settingsChoice(
+            title: Copy.text("完整学习", "Full Learning"),
+            value: "full",
+            selected: learningMode,
+            action: #selector(learningModeChanged(_:))
+        ))
+        modeMenu.addItem(settingsChoice(
+            title: Copy.text("考研阅读", "Exam Reading"),
+            value: "exam",
+            selected: learningMode,
+            action: #selector(learningModeChanged(_:))
+        ))
+        menu.setSubmenu(modeMenu, for: modeItem)
+        menu.addItem(modeItem)
+
+        let languageItem = NSMenuItem(title: Copy.text("语言", "Language"), action: nil, keyEquivalent: "")
+        let languageMenu = NSMenu()
+        for (value, title) in [
             ("auto", Copy.text("自动", "Auto")),
             ("zh", "中文"),
             ("en", "English"),
-        ]
-        for (value, title) in choices {
-            languageButton.addItem(withTitle: title)
-            languageButton.lastItem?.representedObject = value
+        ] {
+            languageMenu.addItem(settingsChoice(
+                title: title,
+                value: value,
+                selected: Copy.preference,
+                action: #selector(languageChanged(_:))
+            ))
         }
-        if let item = languageButton.itemArray.first(where: { ($0.representedObject as? String) == selected }) {
-            languageButton.select(item)
+        menu.setSubmenu(languageMenu, for: languageItem)
+        menu.addItem(languageItem)
+        menu.addItem(.separator())
+
+        let shortcutsItem = NSMenuItem(title: Copy.text("键盘快捷键", "Keyboard Shortcuts"), action: nil, keyEquivalent: "")
+        let shortcutsMenu = NSMenu()
+        shortcutsMenu.autoenablesItems = false
+        for title in [
+            Copy.text("打开窗口　⌥⇧W", "Open window　⌥⇧W"),
+            Copy.text("移动焦点　Tab / ↓", "Move focus　Tab / ↓"),
+            Copy.text("选择牌组　⌘D", "Choose deck　⌘D"),
+            Copy.text("置顶窗口　⌘P", "Pin window　⌘P"),
+            Copy.text("保存并切回　⌘↩", "Save and return　⌘↩"),
+            Copy.text("关闭窗口　Esc", "Close window　Esc"),
+        ] {
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.isEnabled = true
+            shortcutsMenu.addItem(item)
         }
-        languageButton.toolTip = Copy.text("界面与词卡解释语言", "Interface and card language")
-        languageButton.setAccessibilityLabel(Copy.text("语言", "Language"))
+        menu.setSubmenu(shortcutsMenu, for: shortcutsItem)
+        menu.addItem(shortcutsItem)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: settingsButton.bounds.minY - 4), in: settingsButton)
+    }
+
+    private func settingsChoice(
+        title: String,
+        value: String,
+        selected: String,
+        action: Selector
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        item.representedObject = value
+        item.state = value == selected ? .on : .off
+        return item
     }
 
     private func applyLanguage() {
         window.title = Copy.text("Wordflow 快速添加", "Wordflow Quick Add")
         titleLabel.stringValue = Copy.text("快速添加到 Anki", "Quick Add to Anki")
-        subtitleLabel.stringValue = Copy.text("打开窗口：⌥⇧W", "Open window: ⌥⇧W")
         wordLabel.stringValue = Copy.text("单词或短语", "Word or phrase")
         deckLabel.stringValue = Copy.text("牌组", "Deck")
         contextLabel.stringValue = Copy.text("例句或上下文（可选）", "Example or context (optional)")
-        hintLabel.stringValue = Copy.text(
-            "↓/Tab 移动 · ⌘D 牌组 · ⌘↩ 保存切回 · Esc 关闭",
-            "Tab move · ⌘D deck · ⌘↩ return · Esc close"
-        )
         wordField.placeholderString = Copy.text("例如：serendipity", "e.g. serendipity")
         contextView.setAccessibilityLabel(Copy.text("例句或上下文，可选", "Example or context, optional"))
         deckButton.setAccessibilityLabel(Copy.text("保存到 Anki 牌组", "Save to Anki deck"))
         deckButton.toolTip = Copy.text(
-            "这里列出 Anki 中的真实牌组，并记住上次选择",
-            "Lists your actual Anki decks and remembers the last choice"
+            "选择 Anki 牌组（⌘D），并记住上次选择",
+            "Choose an Anki deck (⌘D); the last choice is remembered"
         )
+        contextView.toolTip = Copy.text("Tab 或 ↓ 移动到这里", "Move here with Tab or ↓")
+        settingsButton.toolTip = Copy.text("设置：学习模式、语言与快捷键", "Settings: learning mode, language, and shortcuts")
+        settingsButton.setAccessibilityLabel(Copy.text("设置", "Settings"))
         pinButton.toolTip = Copy.text("始终显示在其他窗口上方（⌘P）", "Keep above other windows (⌘P)")
         pinButton.setAccessibilityLabel(Copy.text("置顶", "Pin"))
         addButton.title = Copy.text("加入 Anki", "Add to Anki")
-        configureLanguageButton()
+        addButton.toolTip = Copy.text("⌘↩ 保存并切回之前的 App", "⌘↩ Save and return to the previous app")
+        updateUpdateButtonAppearance()
         updatePinAppearance()
     }
 
@@ -705,6 +1064,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                       let language = json?["language"] as? String,
                       ["auto", "zh", "en"].contains(language) else {
                     return
+                }
+                if let savedMode = json?["learning_mode"] as? String,
+                   ["full", "exam"].contains(savedMode),
+                   learningMode != savedMode {
+                    learningMode = savedMode
                 }
                 if Copy.preference != language {
                     Copy.preference = language
@@ -820,8 +1184,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         }
     }
 
-    @objc private func languageChanged() {
-        guard let language = languageButton.selectedItem?.representedObject as? String else { return }
+    @objc private func languageChanged(_ sender: NSMenuItem) {
+        guard let language = sender.representedObject as? String,
+              ["auto", "zh", "en"].contains(language) else { return }
         Copy.preference = language
         applyLanguage()
         focusWord()
@@ -840,6 +1205,37 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                         domain: "Wordflow",
                         code: http?.statusCode ?? -1,
                         userInfo: [NSLocalizedDescriptionKey: Copy.text("语言设置未保存", "Could not save the language")]
+                    )
+                }
+            } catch {
+                showStatus(shortMessage(for: error), color: .systemRed, clearAfter: 10)
+            }
+        }
+    }
+
+    @objc private func learningModeChanged(_ sender: NSMenuItem) {
+        guard let selected = sender.representedObject as? String,
+              ["full", "exam"].contains(selected) else { return }
+        learningMode = selected
+        focusWord()
+        guard let request = serviceRequest(
+            path: "/api/settings/learning-mode",
+            method: "POST",
+            payload: ["learning_mode": learningMode]
+        ) else { return }
+        Task {
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                let http = response as? HTTPURLResponse
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                guard http?.statusCode == 200, json?["ok"] as? Bool == true else {
+                    throw NSError(
+                        domain: "Wordflow",
+                        code: http?.statusCode ?? -1,
+                        userInfo: [NSLocalizedDescriptionKey: Copy.text(
+                            "学习模式未保存",
+                            "Could not save the learning mode"
+                        )]
                     )
                 }
             } catch {
@@ -934,6 +1330,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             "context": contextView.string.trimmingCharacters(in: .whitespacesAndNewlines),
             "deck": selectedDeck(),
             "language": Copy.languageCode,
+            "learning_mode": learningMode,
             "source_title": Copy.text("Wordflow 快速添加", "Wordflow Quick Add"),
             "source_url": "",
             "source_type": "native-manual"
@@ -1003,7 +1400,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         wordField.isEnabled = enabled
         contextView.isEditable = enabled
         addButton.isEnabled = enabled
-        languageButton.isEnabled = enabled
+        settingsButton.isEnabled = enabled
     }
 }
 

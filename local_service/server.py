@@ -94,7 +94,7 @@ def open_quick_add_window() -> Dict[str, Any]:
 
 class Handler(BaseHTTPRequestHandler):
     app: WordflowApp
-    server_version = "Wordflow/0.8.0"
+    server_version = "Wordflow/0.9.0"
 
     def _headers(self, status: int = 200) -> None:
         origin = self.headers.get("Origin", "").strip()
@@ -169,6 +169,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(self.app.select_deck(payload))
             elif path == "/api/settings/language":
                 self._json(self.app.select_language(payload))
+            elif path == "/api/settings/learning-mode":
+                self._json(self.app.select_learning_mode(payload))
             elif path == "/api/window/open":
                 self._json(open_quick_add_window())
             else:

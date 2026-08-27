@@ -3,6 +3,7 @@ set -euo pipefail
 
 DEST="$HOME/Library/Application Support/Wordflow"
 AGENT="$HOME/Library/LaunchAgents/com.wordflow.to-anki.plist"
+QUICK_AGENT="$HOME/Library/LaunchAgents/com.wordflow.quick-add.plist"
 
 IS_ZH=0
 case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
@@ -24,7 +25,8 @@ if [[ "$REPLY" != "y" && "$REPLY" != "Y" ]]; then
 fi
 
 /bin/launchctl bootout "gui/$(id -u)/com.wordflow.to-anki" 2>/dev/null || true
-/bin/rm -f "$AGENT"
+/bin/launchctl bootout "gui/$(id -u)/com.wordflow.quick-add" 2>/dev/null || true
+/bin/rm -f "$AGENT" "$QUICK_AGENT"
 /bin/rm -rf "$DEST"
 
 say "Wordflow 本地服务已卸载。" "Wordflow's local service has been removed."

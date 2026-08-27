@@ -13,26 +13,51 @@
           <h1 data-i18n="popupTitle">Quick Add to Anki</h1>
           <p data-i18n="openWindow">Open window: ⌥⇧W</p>
         </div>
-        <div class="select-control select-control-compact" data-select="language">
-          <input id="language" type="hidden" value="auto" />
-          <button
-            id="language-trigger"
-            class="select-trigger"
-            type="button"
-            role="combobox"
-            aria-haspopup="listbox"
-            aria-expanded="false"
-            aria-controls="language-listbox"
-            aria-label="Language"
-            data-i18n-aria-label="languageLabel"
-          >
-            <span class="select-value">Auto</span>
-            <span class="select-chevron" aria-hidden="true"></span>
-          </button>
-          <div id="language-listbox" class="select-menu" role="listbox" hidden>
-            <button class="select-option" type="button" role="option" data-value="auto" data-i18n="languageAuto">Auto</button>
-            <button class="select-option" type="button" role="option" data-value="zh" data-i18n="languageChinese">中文</button>
-            <button class="select-option" type="button" role="option" data-value="en" data-i18n="languageEnglish">English</button>
+        <div class="header-controls">
+          <div class="select-control select-control-compact" data-select="learning-mode">
+            <input id="learning-mode" type="hidden" value="full" />
+            <button
+              id="learning-mode-trigger"
+              class="select-trigger"
+              type="button"
+              role="combobox"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="learning-mode-listbox"
+              aria-label="Learning mode"
+              data-i18n-aria-label="learningModeLabel"
+              title="Choose how much explanation the card includes"
+              data-i18n-title="learningModeHelp"
+            >
+              <span class="select-value">Full</span>
+              <span class="select-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="learning-mode-listbox" class="select-menu" role="listbox" hidden>
+              <button class="select-option" type="button" role="option" data-value="full" data-i18n="learningModeFull">Full</button>
+              <button class="select-option" type="button" role="option" data-value="exam" data-i18n="learningModeExam">Exam</button>
+            </div>
+          </div>
+          <div class="select-control select-control-compact" data-select="language">
+            <input id="language" type="hidden" value="auto" />
+            <button
+              id="language-trigger"
+              class="select-trigger"
+              type="button"
+              role="combobox"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="language-listbox"
+              aria-label="Language"
+              data-i18n-aria-label="languageLabel"
+            >
+              <span class="select-value">Auto</span>
+              <span class="select-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="language-listbox" class="select-menu" role="listbox" hidden>
+              <button class="select-option" type="button" role="option" data-value="auto" data-i18n="languageAuto">Auto</button>
+              <button class="select-option" type="button" role="option" data-value="zh" data-i18n="languageChinese">中文</button>
+              <button class="select-option" type="button" role="option" data-value="en" data-i18n="languageEnglish">English</button>
+            </div>
           </div>
         </div>
       </header>

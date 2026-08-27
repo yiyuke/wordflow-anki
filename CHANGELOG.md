@@ -2,6 +2,19 @@
 
 All notable changes to Wordflow are documented here.
 
+## 0.9.0 — 2026-08-27
+
+- Added persistent Full Learning and Exam Reading modes to both Quick Add interfaces.
+- Exam Reading keeps only the expression's exact Chinese meaning in its sentence, with a smaller generation budget and no redundant notes, collocations, or examples.
+- Tags cards by learning mode so the two workflows can be filtered and evaluated later.
+- Fixed automatic Anki launch by targeting the installed app name instead of an obsolete bundle identifier.
+- Waits up to 30 seconds for AnkiConnect and checks the note identity before retrying an interrupted addition, avoiding accidental duplicates.
+- Made `Option + Shift + W` a true system-wide shortcut backed by the always-on native helper, so it also works from PDF and Word apps when Arc is not focused.
+- Added a compact Help & Feedback button that checks the public repository for updates and turns into a highlighted download icon when a newer version is available.
+- Moved Settings and Help/Updates into the macOS title bar, grouped learning mode, language, and the shortcut reference behind one gear menu, and removed repeated shortcut copy from the form.
+- Replaced the GitHub Issues and email-app handoff with a bilingual two-field form that submits feedback directly through Formspree without collecting contact details.
+- Made the installer safely install and restart the native helper at login, including on Macs with Command Line Tools but without full Xcode.
+
 ## 0.8.0 — 2026-07-26
 
 - Replaced the always-on `<all_urls>` content script with temporary `activeTab` access and packaged on-demand scripts.

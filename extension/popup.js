@@ -2,6 +2,7 @@ const DEFAULT_SERVICE_URL = "http://127.0.0.1:8766";
 const $ = (selector) => document.querySelector(selector);
 let resultClearTimer;
 let languagePreference = "auto";
+let learningMode = "full";
 let messageCatalog = {};
 
 function t(key, substitutions, fallback = key) {
@@ -50,7 +51,9 @@ function localizePage() {
     element.title = t(element.dataset.i18nTitle, undefined, element.title);
   });
   $("#language").value = languagePreference;
+  $("#learning-mode").value = learningMode;
   refreshSelectDisplay("language");
+  refreshSelectDisplay("learning-mode");
   refreshSelectDisplay("deck");
 }
 
@@ -219,10 +222,16 @@ async function getServiceUrl() {
   return data.serviceUrl.replace(/\/$/, "");
 }
 
-async function loadLanguagePreference() {
-  const stored = await chrome.storage.sync.get({ languagePreference: "auto" });
+async function loadPreferences() {
+  const stored = await chrome.storage.sync.get({
+    languagePreference: "auto",
+    learningMode: "full"
+  });
   if (["auto", "zh", "en"].includes(stored.languagePreference)) {
     languagePreference = stored.languagePreference;
+  }
+  if (["full", "exam"].includes(stored.learningMode)) {
+    learningMode = stored.learningMode;
   }
   try {
     const response = await fetch(`${await getServiceUrl()}/api/settings`, {
@@ -231,10 +240,27 @@ async function loadLanguagePreference() {
     const data = await response.json();
     if (response.ok && data.ok && ["auto", "zh", "en"].includes(data.language)) {
       languagePreference = data.language;
-      await chrome.storage.sync.set({ languagePreference });
     }
+    if (response.ok && data.ok && ["full", "exam"].includes(data.learning_mode)) {
+      learningMode = data.learning_mode;
+    }
+    await chrome.storage.sync.set({ languagePreference, learningMode });
   } catch (_error) {
     // The saved browser preference and automatic language remain available offline.
+  }
+}
+
+async function saveLearningMode() {
+  learningMode = $("#learning-mode").value;
+  await chrome.storage.sync.set({ learningMode });
+  const response = await fetch(`${await getServiceUrl()}/api/settings/learning-mode`, {
+    method: "POST",
+    headers: clientHeaders(),
+    body: JSON.stringify({ learning_mode: learningMode })
+  });
+  const data = await response.json();
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error || t("learningModeSaveFailed", undefined, "Could not save the learning mode"));
   }
 }
 
@@ -332,6 +358,7 @@ async function addWord(returnAfterSave = false) {
         context: $("#context").value.trim(),
         deck: $("#deck").value,
         language: languageCode(),
+        learning_mode: learningMode,
         source_title: t("sourceManual", undefined, "Wordflow manual input"),
         source_url: "",
         source_type: "browser-manual"
@@ -356,13 +383,14 @@ async function addWord(returnAfterSave = false) {
 }
 
 setupSelect("language");
+setupSelect("learning-mode");
 setupSelect("deck");
 document.addEventListener("click", (event) => {
   if (!event.target.closest("[data-select]")) closeAllSelects();
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadLanguagePreference();
+  await loadPreferences();
   await loadMessageCatalog();
   localizePage();
   $("#word").focus();
@@ -377,6 +405,11 @@ $("#deck").addEventListener("change", () => {
 });
 $("#language").addEventListener("change", () => {
   saveLanguagePreference().catch((error) => {
+    setResult(friendlyMessage(error), { error: true, clearAfter: 10000 });
+  });
+});
+$("#learning-mode").addEventListener("change", () => {
+  saveLearningMode().catch((error) => {
     setResult(friendlyMessage(error), { error: true, clearAfter: 10000 });
   });
 });

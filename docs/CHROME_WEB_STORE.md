@@ -1,6 +1,6 @@
 # Chrome Web Store submission kit
 
-This file is the source of truth for the Wordflow 0.8.0 store submission. Copy the relevant fields into the Chrome Web Store Developer Dashboard after the release branch has been merged.
+This file is the source of truth for the Wordflow 0.9.0 store submission. Copy the relevant fields into the Chrome Web Store Developer Dashboard after the release branch has been merged.
 
 ## Package
 
@@ -8,7 +8,7 @@ This file is the source of truth for the Wordflow 0.8.0 store submission. Copy t
 ./scripts/package-extension.sh
 ```
 
-Upload `dist/wordflow-extension-0.8.0.zip`. The package contains only the Manifest V3 browser extension. It never contains an OpenAI API key, local `.env` file, Anki data, or developer credentials.
+Upload `dist/wordflow-extension-0.9.0.zip`. The package contains only the Manifest V3 browser extension. It never contains an OpenAI API key, local `.env` file, Anki data, or developer credentials.
 
 ## Product details
 
@@ -47,7 +47,7 @@ https://github.com/yiyuke/wordflow-anki/blob/main/PRIVACY.md
 ```text
 Wordflow turns the English words and phrases you meet while reading into context-aware Anki vocabulary cards.
 
-Select a word on a webpage and use the context menu or keyboard shortcut. Wordflow keeps a limited amount of the original sentence, creates a compact explanation that fits the expression, and sends the finished note to your chosen Anki deck. For words found in PDFs, Word documents, videos, or podcasts, open the keyboard-first Quick Add window from anywhere on macOS.
+Select a word on a webpage and use the context menu or keyboard shortcut. Wordflow keeps a limited amount of the original sentence, creates either a complete learning card or a concise Exam Reading meaning, and sends the finished note to your chosen Anki deck. For words found in PDFs, Word documents, videos, or podcasts, open the keyboard-first Quick Add window from anywhere on macOS.
 
 Each note can include:
 • pronunciation and a clear meaning
@@ -71,7 +71,7 @@ Wordflow has no account, advertising, analytics, telemetry, or developer-operate
 ```text
 Wordflow 把你在阅读中真正遇到的英文单词和短语，变成保留语境、可以直接复习的 Anki 词卡。
 
-在网页上选中一个词，通过右键菜单或快捷键调用 Wordflow。它会保留有限的原句语境，根据词语本身生成紧凑的学习说明，并把完成的 Note 送到你选择的 Anki 牌组。遇到 PDF、Word 文档、视频或播客中的词，也可以从 macOS 的任何位置打开键盘优先的 Quick Add 窗口。
+在网页上选中一个词，通过右键菜单或快捷键调用 Wordflow。它会保留有限的原句语境，根据学习目标生成完整学习词卡或简洁的考研阅读释义，并把完成的 Note 送到你选择的 Anki 牌组。遇到 PDF、Word 文档、视频或播客中的词，也可以从 macOS 的任何位置打开键盘优先的 Quick Add 窗口。
 
 每条 Note 可以包含：
 • 发音和清楚的释义
