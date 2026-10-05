@@ -12,6 +12,7 @@ import argparse
 import html
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
@@ -43,11 +44,36 @@ def raw_fields(note: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
-def recent_notes(client: AnkiClient, limit: int, note_ids: Iterable[int]) -> List[Dict[str, Any]]:
+def anki_query(deck: str, excluded_tags: Iterable[str]) -> str:
+    terms = ["tag:wordflow"]
+    if deck:
+        escaped_deck = deck.replace("\\", "\\\\").replace('"', '\\"')
+        terms.insert(0, f'deck:"{escaped_deck}"')
+    for tag in excluded_tags:
+        normalized = safe_tag(tag)
+        if normalized:
+            terms.append(f"-tag:{normalized}")
+    return " ".join(terms)
+
+
+def recent_notes(
+    client: AnkiClient,
+    limit: int,
+    note_ids: Iterable[int],
+    *,
+    deck: str = "",
+    excluded_tags: Iterable[str] = (),
+) -> List[Dict[str, Any]]:
     requested = [int(note_id) for note_id in note_ids]
     if not requested:
         requested = sorted(
-            (int(note_id) for note_id in client.invoke("findNotes", query="tag:wordflow")),
+            (
+                int(note_id)
+                for note_id in client.invoke(
+                    "findNotes",
+                    query=anki_query(deck, excluded_tags),
+                )
+            ),
             reverse=True,
         )[:limit]
     if not requested:
@@ -109,10 +135,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=10, help="最近笔记数量（默认 10）")
     parser.add_argument("--note-id", type=int, action="append", default=[], help="只处理指定 note id")
+    parser.add_argument("--deck", default="", help="只处理指定牌组中的 Wordflow 笔记")
+    parser.add_argument(
+        "--exclude-tag",
+        action="append",
+        default=[],
+        help="跳过带指定标签的笔记；可重复使用",
+    )
+    parser.add_argument("--quiet", action="store_true", help="批量处理时不打印每张卡片的正文")
+    parser.add_argument("--workers", type=int, default=1, help="并行生成数量（默认 1，最多 4）")
+    parser.add_argument("--browse", action="store_true", help="完成后主动打开 Anki 浏览器（默认不抢焦点）")
     parser.add_argument("--apply", action="store_true", help="原地更新 Anki；默认只预览")
     args = parser.parse_args()
     if args.limit < 1 or args.limit > 100:
         parser.error("--limit 必须在 1 到 100 之间")
+    if args.workers < 1 or args.workers > 4:
+        parser.error("--workers 必须在 1 到 4 之间")
 
     config = Config.from_env()
     if config.mock_openai or config.mock_anki:
@@ -122,23 +160,48 @@ def main() -> int:
 
     client = AnkiClient(config)
     generator = OpenAICardGenerator(config)
-    notes = recent_notes(client, args.limit, args.note_id)
+    notes = recent_notes(
+        client,
+        args.limit,
+        args.note_id,
+        deck=args.deck,
+        excluded_tags=args.exclude_tag,
+    )
     decks = deck_map(client, notes)
     generated: List[Dict[str, Any]] = []
 
-    for index, note in enumerate(notes, start=1):
+    def generate_item(index_and_note: tuple[int, Dict[str, Any]]) -> Dict[str, Any]:
+        index, note = index_and_note
         note_id = int(note["noteId"])
         capture = capture_for(note)
-        print(f"[{index}/{len(notes)}] 重新解释 {capture['text']} …", flush=True)
         card = generator.generate(capture)
-        print(f"    {card['learning_note']}", flush=True)
-        generated.append({
+        return {
+            "index": index,
             "note_id": note_id,
             "note": note,
             "capture": capture,
             "card": card,
             "deck": decks.get(note_id, ""),
-        })
+        }
+
+    indexed_notes = list(enumerate(notes, start=1))
+    if args.workers == 1:
+        generated_items = map(generate_item, indexed_notes)
+    else:
+        executor = ThreadPoolExecutor(max_workers=args.workers)
+        generated_items = executor.map(generate_item, indexed_notes)
+    try:
+        for item in generated_items:
+            index = item["index"]
+            capture = item["capture"]
+            card = item["card"]
+            print(f"[{index}/{len(notes)}] 已生成 {capture['text']}", flush=True)
+            if not args.quiet:
+                print(f"    {card['learning_note']}", flush=True)
+            generated.append(item)
+    finally:
+        if args.workers != 1:
+            executor.shutdown(wait=True)
 
     if not args.apply:
         print("\n以上仅为预览；确认后加 --apply 原地更新。", flush=True)
@@ -171,12 +234,13 @@ def main() -> int:
         restore_notes(client, updated)
         raise
 
-    note_query = " OR ".join(f"nid:{item['note_id']}" for item in generated)
-    try:
-        client.invoke("guiBrowse", query=note_query)
-    except RuntimeError:
-        pass
-    print(f"\n已原地更新 {len(generated)} 张笔记，并在 Anki 浏览器中打开。", flush=True)
+    if args.browse:
+        note_query = " OR ".join(f"nid:{item['note_id']}" for item in generated)
+        try:
+            client.invoke("guiBrowse", query=note_query)
+        except RuntimeError:
+            pass
+    print(f"\n已在后台原地更新 {len(generated)} 张笔记。", flush=True)
     return 0
 
 
