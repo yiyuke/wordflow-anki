@@ -1,6 +1,6 @@
 # Chrome Web Store submission kit
 
-This file is the source of truth for the Wordflow 0.9.0 store submission. Copy the relevant fields into the Chrome Web Store Developer Dashboard after the release branch has been merged.
+This file is the source of truth for the Wordflow 0.9.1 store submission. Copy the relevant fields into the Chrome Web Store Developer Dashboard after the release branch has been merged.
 
 ## Package
 
@@ -8,7 +8,7 @@ This file is the source of truth for the Wordflow 0.9.0 store submission. Copy t
 ./scripts/package-extension.sh
 ```
 
-Upload `dist/wordflow-extension-0.9.0.zip`. The package contains only the Manifest V3 browser extension. It never contains an OpenAI API key, local `.env` file, Anki data, or developer credentials.
+Upload `dist/wordflow-extension-0.9.1.zip`. The package contains only the Manifest V3 browser extension. It never contains an OpenAI API key, local `.env` file, Anki data, or developer credentials.
 
 ## Product details
 
