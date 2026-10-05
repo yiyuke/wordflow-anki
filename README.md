@@ -47,7 +47,7 @@ I believe the best way to remember vocabulary is not to memorize an unfamiliar l
 - **Almost no interruption.** Select and right-click, or press `Option + Shift + W` to open Quick Add.
 - **Active recall in both directions.** Every capture creates both recognition and production cards.
 
-Choose the card that matches your goal. **Full Learning** adds pronunciation, a clear meaning, 2–3 useful collocations, 1–2 reusable examples, and one compact learning note. **Exam Reading** keeps only the exact Chinese meaning of the word in its sentence, so you can move through reading material quickly without an overloaded card.
+Choose the card that matches your goal. **Full Learning** adds pronunciation, a clear meaning, 2–3 useful collocations, 1–2 reusable examples, and one compact **form-to-meaning memory bridge**. The bridge may use a real morpheme, reliable word history, sound, imagery, contrast, or phrase logic—whichever best explains why this expression looks or sounds the way it does. **Exam Reading** keeps only the exact Chinese meaning of the word in its sentence, so you can move through reading material quickly without an overloaded card.
 
 ## See the whole learning loop
 
@@ -173,7 +173,7 @@ Desktop / PDF input ────┘                         ↓
                                                 AnkiConnect → Anki
 ```
 
-Wordflow listens only on `127.0.0.1`. A strict JSON Schema keeps cards compact while the model chooses the most helpful explanation strategy. Li Jigang's [`ljg-word` Skill](https://github.com/lijigang/ljg-skills/blob/master/skills/ljg-word/SKILL.md) inspired one optional image-to-meaning technique; it is not a runtime dependency.
+Wordflow listens only on `127.0.0.1`. A strict JSON Schema keeps cards compact while the model chooses one primary memory strategy. Internally it generates a form anchor, a meaning link, and—only when useful—a short contrast; Anki renders them as one continuous paragraph. Etymologies must name the real source form and the exact letters that survive in the modern word, without inventing neat-looking roots. Li Jigang's [`ljg-word` Skill](https://github.com/lijigang/ljg-skills/blob/master/skills/ljg-word/SKILL.md) inspired one optional image-to-meaning technique; it is not a runtime dependency.
 
 </details>
 

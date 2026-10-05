@@ -16,6 +16,7 @@ sys.path.insert(0, str(SERVICE_DIR))
 
 from wordflow import (  # noqa: E402
     AnkiClient,
+    anki_fields,
     CARD_TEMPLATES,
     CARD_CSS,
     card_schema,
@@ -85,7 +86,7 @@ class WordflowTests(unittest.TestCase):
         extension_dir = SERVICE_DIR.parent / "extension"
         manifest = json.loads((extension_dir / "manifest.json").read_text(encoding="utf-8"))
         worker = (extension_dir / "service-worker.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["version"], "0.9.0")
+        self.assertEqual(manifest["version"], "0.9.1")
         self.assertEqual(
             set(manifest["permissions"]),
             {"contextMenus", "storage", "activeTab", "scripting"},
@@ -295,7 +296,7 @@ class WordflowTests(unittest.TestCase):
 
     def test_compact_template_has_one_learning_flow(self):
         recognition_back = CARD_TEMPLATES[0]["Back"]
-        self.assertIn("wordflow-managed:3", recognition_back)
+        self.assertIn("wordflow-managed:4", recognition_back)
         self.assertIn("class='learning-note'", recognition_back)
         self.assertNotIn("Word insight", recognition_back)
         self.assertNotIn("{{Etymology}}", recognition_back)
@@ -449,7 +450,16 @@ class WordflowTests(unittest.TestCase):
             raise AssertionError(action)
 
         client.invoke = invoke
-        result = client.add_card(
+        capture = {
+            "text": "incubate",
+            "context": "They incubate ideas.",
+            "source_type": "test",
+            "source_title": "Test",
+            "source_url": "",
+            "language": "zh",
+            "learning_mode": "full",
+        }
+        card = normalize_card(
             {
                 "word": "incubate",
                 "lemma": "incubate",
@@ -460,27 +470,37 @@ class WordflowTests(unittest.TestCase):
                 "context": "They incubate ideas.",
                 "context_cloze": "They […] ideas.",
                 "collocations": ["incubate an idea", "incubate a startup"],
-                "learning_note": "让想法像蛋一样，在支持和时间中逐渐成熟。",
+                "memory_strategy": "image",
+                "memory_anchor": "incubate → 想象把蛋放进恒温箱。",
+                "memory_link": "给想法稳定的支持和时间，让它逐渐成熟。",
+                "contrast_note": "",
                 "examples": ["The lab incubates new ideas."],
                 "tags": ["verb"],
             },
-            {
-                "source_type": "test",
-                "source_title": "Test",
-                "source_url": "",
-                "language": "zh",
-            },
+            capture,
+        )
+        result = client.add_card(
+            card,
+            capture,
             deck_name="Test Deck",
         )
         self.assertEqual(result["note_id"], 123)
         self.assertEqual(added["fields"]["Etymology"], "")
-        self.assertEqual(added["fields"]["MemoryHook"], "让想法像蛋一样，在支持和时间中逐渐成熟。")
+        self.assertEqual(
+            added["fields"]["MemoryHook"],
+            "incubate → 想象把蛋放进恒温箱。 给想法稳定的支持和时间，让它逐渐成熟。",
+        )
         self.assertIn("class='collocation'", added["fields"]["Collocations"])
         self.assertIn("class='example'", added["fields"]["Examples"])
         self.assertNotIn("insight-item", added["fields"]["MemoryHook"])
 
     def test_generation_uses_latency_reasoning_setting(self):
-        capture = normalize_capture({"text": "lucid", "context": "A lucid explanation.", "language": "en"})
+        capture = normalize_capture({
+            "text": "lucid",
+            "context": "A lucid explanation.",
+            "sense_hint": "clear and easy to understand",
+            "language": "en",
+        })
         card = {
             "word": "lucid",
             "lemma": "lucid",
@@ -491,7 +511,10 @@ class WordflowTests(unittest.TestCase):
             "context": capture["context"],
             "context_cloze": "A […] explanation.",
             "collocations": ["lucid explanation", "lucid account"],
-            "learning_note": "From Latin lux, light: a lucid idea feels mentally illuminated rather than merely simple.",
+            "memory_strategy": "etymology",
+            "memory_anchor": "luc- ← Latin lux, light.",
+            "memory_link": "A lucid idea feels mentally illuminated rather than merely simple.",
+            "contrast_note": "Clear is general; lucid emphasizes effortless understanding.",
             "examples": ["Her answer was lucid."],
             "tags": ["adjective"],
         }
@@ -505,21 +528,33 @@ class WordflowTests(unittest.TestCase):
         }
         config = replace(mock_config(), mock_openai=False, openai_api_key="test-key")
         with patch("wordflow._request_json", return_value=response) as request_json:
-            OpenAICardGenerator(config).generate(capture)
+            generated = OpenAICardGenerator(config).generate(capture)
         payload = request_json.call_args.args[1]
         self.assertEqual(payload["reasoning"], {"effort": "none"})
         self.assertEqual(payload["max_output_tokens"], 1100)
         self.assertIn("explanation language is English", payload["input"][0]["content"])
-        self.assertIn("learning_note", payload["text"]["format"]["schema"]["required"])
+        required = payload["text"]["format"]["schema"]["required"]
+        self.assertNotIn("learning_note", required)
+        self.assertIn("memory_strategy", required)
+        self.assertIn("memory_anchor", required)
+        self.assertIn("memory_link", required)
+        self.assertIn("contrast_note", required)
         self.assertNotIn("original_image", payload["text"]["format"]["schema"]["required"])
         self.assertEqual(payload["text"]["format"]["schema"]["properties"]["collocations"]["minItems"], 2)
         self.assertEqual(payload["text"]["format"]["schema"]["properties"]["collocations"]["maxItems"], 3)
         self.assertEqual(payload["text"]["format"]["schema"]["properties"]["examples"]["minItems"], 1)
         self.assertEqual(payload["text"]["format"]["schema"]["properties"]["examples"]["maxItems"], 2)
-        self.assertIn("Adapt learning_note", payload["input"][0]["content"])
+        self.assertIn("exact modern letters", payload["input"][0]["content"])
+        self.assertIn("no standalone met-", payload["input"][0]["content"])
+        self.assertEqual(
+            generated["learning_note"],
+            "luc- ← Latin lux, light. A lucid idea feels mentally illuminated rather than merely simple. "
+            "Clear is general; lucid emphasizes effortless understanding.",
+        )
         user_input = json.loads(payload["input"][1]["content"])
         self.assertEqual(user_input["explanation_language"], "en")
         self.assertEqual(user_input["learning_mode"], "full")
+        self.assertEqual(user_input["existing_sense_hint"], "clear and easy to understand")
 
     def test_exam_mode_generates_only_contextual_meaning(self):
         capture = normalize_capture({
@@ -538,7 +573,10 @@ class WordflowTests(unittest.TestCase):
             "context": capture["context"],
             "context_cloze": "These findings […] directly on the question.",
             "collocations": [],
-            "learning_note": "",
+            "memory_strategy": "none",
+            "memory_anchor": "",
+            "memory_link": "",
+            "contrast_note": "",
             "examples": [],
             "tags": ["verb"],
         }
@@ -559,10 +597,60 @@ class WordflowTests(unittest.TestCase):
         self.assertIn("exact sense used in the supplied sentence", payload["input"][0]["content"])
         self.assertEqual(generated["meaning_zh"], "与……直接相关")
         self.assertEqual(generated["definition_en"], "")
+        self.assertEqual(generated["memory_strategy"], "none")
         self.assertEqual(generated["learning_note"], "")
         self.assertEqual(generated["collocations"], [])
         self.assertEqual(generated["examples"], [])
         self.assertEqual(card_schema("full")["properties"]["examples"]["minItems"], 1)
+
+    def test_meticulous_bridge_names_the_real_source_without_a_fake_modern_root(self):
+        capture = normalize_capture({"text": "meticulous", "language": "zh"})
+        card = normalize_card(
+            {
+                "lemma": "meticulous",
+                "memory_strategy": "etymology",
+                "memory_anchor": (
+                    "meticul- ← 拉丁语 meticulosus（害怕的）← metus（害怕）；"
+                    "现代英语没有独立的 met- 表示“害怕”。"
+                ),
+                "memory_link": "因为怕出错而反复检查细节，逐渐发展为“一丝不苟”。",
+                "contrast_note": "careful 是一般小心；meticulous 强调不放过每个细节。",
+                "collocations": [],
+                "examples": [],
+                "tags": [],
+            },
+            capture,
+        )
+        self.assertEqual(card["memory_strategy"], "etymology")
+        self.assertIn("meticul-", card["learning_note"])
+        self.assertIn("metus", card["learning_note"])
+        self.assertIn("没有独立的 met-", card["learning_note"])
+
+    def test_regeneration_sense_hint_is_bounded(self):
+        capture = normalize_capture({
+            "text": "palter",
+            "sense_hint": " 含糊其辞 " + "x" * 600,
+        })
+        self.assertEqual(len(capture["sense_hint"]), 500)
+
+    def test_anki_fields_preserve_audio_during_in_place_regeneration(self):
+        capture = normalize_capture({"text": "lucid", "source_title": "Essay"})
+        card = normalize_card(
+            {
+                "lemma": "lucid",
+                "memory_strategy": "etymology",
+                "memory_anchor": "luc- ← Latin lux（光）。",
+                "memory_link": "理解起来像被光照亮一样清楚。",
+                "contrast_note": "",
+                "collocations": [],
+                "examples": [],
+                "tags": [],
+            },
+            capture,
+        )
+        fields = anki_fields(card, capture, audio_field="[sound:lucid.mp3]")
+        self.assertEqual(fields["Audio"], "[sound:lucid.mp3]")
+        self.assertIn("luc-", fields["MemoryHook"])
 
     def test_normalization_caps_repetition_and_content_counts(self):
         capture = normalize_capture(

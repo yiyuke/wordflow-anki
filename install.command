@@ -81,12 +81,27 @@ else
   /bin/rm -f "$QUICK_AGENT"
 fi
 
-/bin/launchctl bootout "gui/$(id -u)/com.wordflow.to-anki" 2>/dev/null || true
-/bin/launchctl bootstrap "gui/$(id -u)" "$AGENT"
-/bin/launchctl kickstart -k "gui/$(id -u)/com.wordflow.to-anki"
+reload_agent() {
+  local label="$1"
+  local plist="$2"
+  local domain="gui/$(id -u)"
+  /bin/launchctl bootout "$domain/$label" 2>/dev/null || true
+  # launchd can briefly retain a just-removed job and return errno 5. A short,
+  # bounded retry makes reinstalling reliable without requiring root access.
+  for _ in 1 2 3; do
+    if /bin/launchctl bootstrap "$domain" "$plist" 2>/dev/null; then
+      /bin/launchctl kickstart -k "$domain/$label"
+      return 0
+    fi
+    /bin/sleep 0.4
+  done
+  /bin/launchctl bootstrap "$domain" "$plist"
+  /bin/launchctl kickstart -k "$domain/$label"
+}
+
+reload_agent "com.wordflow.to-anki" "$AGENT"
 if [[ -f "$QUICK_AGENT" ]]; then
-  /bin/launchctl bootstrap "gui/$(id -u)" "$QUICK_AGENT"
-  /bin/launchctl kickstart -k "gui/$(id -u)/com.wordflow.quick-add"
+  reload_agent "com.wordflow.quick-add" "$QUICK_AGENT"
 fi
 
 echo
