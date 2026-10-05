@@ -8,7 +8,7 @@ All notable changes to Wordflow are documented here.
 - Requires etymology-based notes to name the real source form, translate it, and identify the exact modern letters that descend from it without inventing neat root boundaries.
 - Lets the model choose morphology, reliable etymology, a clearly labeled sound aid, imagery, semantic contrast, or phrase logic according to the expression.
 - Limits synonym help to one memorable distinction and places the memory bridge before the secondary English definition on the card back.
-- Adds a rollback-aware maintenance command for regenerating existing notes in place while preserving context, source, audio, and note identity.
+- Adds a rollback-aware maintenance command for regenerating existing notes in place while preserving context, source, audio, and note identity; bulk updates stay in the background unless browsing is explicitly requested.
 - Retries transient macOS launchd registration conflicts during reinstall instead of asking the user to run the installer as root.
 
 ## 0.9.0 — 2026-08-27
