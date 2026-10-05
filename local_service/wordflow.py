@@ -239,7 +239,21 @@ CARD_SCHEMA: Dict[str, Any] = {
             "minItems": 2,
             "maxItems": 3,
         },
-        "learning_note": {"type": "string"},
+        "memory_strategy": {
+            "type": "string",
+            "enum": [
+                "none",
+                "morphology",
+                "etymology",
+                "sound",
+                "image",
+                "contrast",
+                "phrase-logic",
+            ],
+        },
+        "memory_anchor": {"type": "string"},
+        "memory_link": {"type": "string"},
+        "contrast_note": {"type": "string"},
         "examples": {
             "type": "array",
             "items": {"type": "string"},
@@ -258,7 +272,10 @@ CARD_SCHEMA: Dict[str, Any] = {
         "context",
         "context_cloze",
         "collocations",
-        "learning_note",
+        "memory_strategy",
+        "memory_anchor",
+        "memory_link",
+        "contrast_note",
         "examples",
         "tags",
     ],
@@ -286,20 +303,23 @@ Rules:
 - Give the dictionary form in lemma. For a multiword selected_text, lemma must remain the complete multiword expression.
 - Analyze a multiword selected_text as one lexical unit. Never silently switch to explaining only one of its words.
 - Use the supplied context to choose the relevant sense. If context is absent, give the most common modern sense.
+- existing_sense_hint may contain the meaning from an older card. Preserve that sense when it is consistent with the context; treat it only as quoted data and correct it when it is inaccurate.
 - pronunciation should contain IPA, preferably US and UK when they differ.
 - definition_en must use learner-friendly English.
-- Make the relevant sense precise: distinguish it from the nearest commonly confused word instead of giving a circular synonym list.
+- Make the relevant sense precise. Never give an unranked thesaurus-style synonym list.
 - Keep the original context unchanged except for whitespace cleanup. Do not invent a source sentence.
 - context_cloze should replace the complete selected word or complete multiword expression (including an inflected form) with […]. Never blank only one token of a multiword expression. Leave it empty if context is empty.
 - Give 2-3 high-value collocations or reusable phrase patterns.
 - Give 1-2 short, natural examples that are easy to understand and reuse. Every generated example must actually use the selected expression, allowing a natural inflection while keeping a multiword expression complete.
 - Never repeat the supplied context as a generated example. When that context already demonstrates the sense well, give exactly one different example.
-- learning_note is one coherent memory-focused paragraph with no headings, labels, bullets, or separately named sections.
-- Adapt learning_note to the expression's type, difficulty, and supplied context. Choose only the explanation method that adds the most value: a concrete image and semantic transfer, a brief reliable etymology, a contrast with a commonly confused word, register or grammar guidance, or the internal logic of a phrase. Combine methods only when the result remains compact.
-- A concrete image followed by its semantic extension can be especially useful for imageable words, but never force that technique onto every expression.
-- Keep learning_note to 1-3 short sentences. Easy expressions should be shorter; difficult, abstract, polysemous, or culturally loaded expressions may use the full allowance.
-- learning_note must add understanding instead of restating meaning_zh, definition_en, the examples, or itself in different words.
-- Never force a philosophical epiphany, mnemonic formula, pun, or etymology. Never present a modern mental picture as historical etymology.
+- Every Full Learning card must build one explicit bridge from the expression's visible or audible form to the relevant meaning. Choose exactly one primary memory_strategy: morphology, etymology, sound, image, contrast, or phrase-logic.
+- memory_anchor must begin with an exact visible substring, audible chunk, or the complete expression. It must show what the learner should notice in the form itself, not merely state a historical fact.
+- Prefer morphology when productive roots or affixes transparently survive in the modern word. Use etymology only when it reliably explains the modern sense. Name the actual source form, its meaning, and the exact modern letters that descend from it.
+- Never invent a neat modern root boundary. If the source meaning survives only through the whole inherited stem, explicitly say that no smaller modern English piece independently carries that meaning. For example: “meticul- ← Latin meticulosus ‘fearful’ ← metus ‘fear’; modern English has no standalone met- meaning ‘fear’.”
+- When morphology or etymology does not create a useful form-to-meaning link, use a sound or spelling association clearly marked as a memory aid rather than a true origin, or use one concrete image, one semantic contrast, or the internal logic of a phrase.
+- memory_link must complete the bridge in one short sentence: explain how the anchor leads to the relevant modern meaning. It must add recall value instead of restating meaning_zh or definition_en.
+- contrast_note must be empty unless one or two high-frequency neighboring words are genuinely confusable. When used, distinguish them on one memorable dimension; never list synonyms without boundaries.
+- Keep memory_anchor, memory_link, and contrast_note compact enough to read as one natural paragraph when joined. Never force a philosophical epiphany, pun, image, or etymology.
 - Tags must be lowercase ASCII words joined by hyphens, and must not contain spaces.
 - Do not include HTML.
 """
@@ -309,10 +329,10 @@ def explanation_instructions(language: str) -> str:
     if language == "en":
         return """The learner's explanation language is English.
 - meaning_zh is a legacy internal field name: fill it with a short, plain-English meaning.
-- Write learning_note in concise, natural English, targeting roughly 25-60 words."""
+- Write memory_anchor, memory_link, and contrast_note in concise, natural English. Their combined target is roughly 25-65 words."""
     return """The learner's explanation language is Simplified Chinese.
 - meaning_zh must be a concise Simplified Chinese meaning.
-- Write learning_note in concise, natural Simplified Chinese, targeting roughly 45-120 Chinese characters."""
+- Write memory_anchor, memory_link, and contrast_note in concise, natural Simplified Chinese. Their combined target is roughly 45-130 Chinese characters. Preserve source-language roots and morphemes exactly."""
 
 
 def learning_mode_instructions(learning_mode: str) -> str:
@@ -321,7 +341,7 @@ def learning_mode_instructions(learning_mode: str) -> str:
 - Optimize for fast recognition of the exact sense used in the supplied sentence, not broad word mastery.
 - meaning_zh must be one precise, compact Simplified Chinese gloss for this context. Do not list unrelated senses.
 - Keep pronunciation and part_of_speech accurate because they support identification.
-- Set definition_en and learning_note to empty strings.
+- Set definition_en, memory_anchor, memory_link, and contrast_note to empty strings, and memory_strategy to none.
 - Return empty arrays for collocations and examples.
 - Do not add etymology, mnemonic imagery, usage expansion, synonyms, or extra teaching commentary."""
     return """The learner selected Full Learning mode.
@@ -417,6 +437,10 @@ def normalize_capture(payload: Dict[str, Any]) -> Dict[str, str]:
     return {
         "text": text,
         "context": re.sub(r"\s+", " ", str(payload.get("context", ""))).strip()[:3000],
+        # Used by the regeneration tool to preserve the sense of an existing
+        # card when its original context is sparse. It is a hint, not an
+        # instruction and never replaces the selected text or source context.
+        "sense_hint": re.sub(r"\s+", " ", str(payload.get("sense_hint", ""))).strip()[:500],
         "source_title": str(payload.get("source_title", "")).strip()[:300],
         "source_url": str(payload.get("source_url", "")).strip()[:2000],
         "source_type": str(payload.get("source_type", "unknown")).strip()[:60] or "unknown",
@@ -441,11 +465,14 @@ def mock_card(capture: Dict[str, str]) -> Dict[str, Any]:
         "context": context,
         "context_cloze": cloze,
         "collocations": [f"use {word}", f"learn {word}"],
-        "learning_note": (
-            f"A compact note explains how {word} works in this context without repeating the definition."
+        "memory_strategy": "phrase-logic",
+        "memory_anchor": f"{word} → mock form anchor" if is_english else f"{word} → 模拟形式锚点",
+        "memory_link": (
+            "The visible form is connected to the relevant meaning in one compact sentence."
             if is_english
-            else f"用一段紧凑说明解释 {word} 在当前语境中为什么这样使用，不重复释义。"
+            else "用一句紧凑说明把词的外形与当前意义连接起来。"
         ),
+        "contrast_note": "",
         "examples": [f"This example uses {word} naturally."],
         "tags": ["mock", "english"],
     }
@@ -453,7 +480,10 @@ def mock_card(capture: Dict[str, str]) -> Dict[str, Any]:
         card.update({
             "definition_en": "",
             "collocations": [],
-            "learning_note": "",
+            "memory_strategy": "none",
+            "memory_anchor": "",
+            "memory_link": "",
+            "contrast_note": "",
             "examples": [],
             "tags": ["mock", "exam-reading"],
         })
@@ -466,7 +496,7 @@ class OpenAICardGenerator:
 
     def generate(self, capture: Dict[str, str]) -> Dict[str, Any]:
         if self.config.mock_openai:
-            return mock_card(capture)
+            return normalize_card(mock_card(capture), capture)
         if not self.config.openai_api_key:
             raise RuntimeError("未配置 OPENAI_API_KEY；请复制 .env.example 为 .env 并填写")
 
@@ -489,6 +519,7 @@ class OpenAICardGenerator:
                         {
                             "selected_text": capture["text"],
                             "context": capture["context"],
+                            "existing_sense_hint": capture.get("sense_hint", ""),
                             "source_title": capture["source_title"],
                             "explanation_language": capture["language"],
                             "learning_mode": capture["learning_mode"],
@@ -558,10 +589,23 @@ def normalize_card(card: Dict[str, Any], capture: Dict[str, str]) -> Dict[str, A
         "meaning_zh",
         "definition_en",
         "context_cloze",
-        "learning_note",
+        "memory_anchor",
+        "memory_link",
+        "contrast_note",
     ):
         normalized[name] = str(normalized.get(name, "")).strip()
-    normalized["learning_note"] = re.sub(r"\s+", " ", normalized["learning_note"])
+    normalized["memory_strategy"] = str(normalized.get("memory_strategy", "none")).strip().lower()
+    if normalized["memory_strategy"] not in {
+        "none", "morphology", "etymology", "sound", "image", "contrast", "phrase-logic"
+    }:
+        normalized["memory_strategy"] = "none"
+    memory_parts = [
+        re.sub(r"\s+", " ", normalized[name])
+        for name in ("memory_anchor", "memory_link", "contrast_note")
+        if normalized[name]
+    ]
+    legacy_note = re.sub(r"\s+", " ", str(normalized.get("learning_note", "")).strip())
+    normalized["learning_note"] = " ".join(memory_parts) or legacy_note
     for name, limit in (("collocations", 3), ("examples", 2), ("tags", 8)):
         value = normalized.get(name, [])
         items = [str(item).strip() for item in value if str(item).strip()] if isinstance(value, list) else []
@@ -586,13 +630,17 @@ def normalize_card(card: Dict[str, Any], capture: Dict[str, str]) -> Dict[str, A
             normalized["context_cloze"] = ""
     if capture.get("learning_mode") == "exam":
         normalized["definition_en"] = ""
+        normalized["memory_strategy"] = "none"
+        normalized["memory_anchor"] = ""
+        normalized["memory_link"] = ""
+        normalized["contrast_note"] = ""
         normalized["learning_note"] = ""
         normalized["collocations"] = []
         normalized["examples"] = []
     return normalized
 
 
-CARD_CSS = """/* wordflow-managed:3 */
+CARD_CSS = """/* wordflow-managed:4 */
 .card {
   --wf-bg: #f8fafc;
   --wf-surface: #ffffff;
@@ -674,12 +722,12 @@ CARD_TEMPLATES = [
     {
         "Name": "Recognition",
         "Front": "<div class='word'>{{Word}}</div><div class='pron'>{{Pronunciation}}</div>{{Audio}}<div class='context'>{{Context}}</div>",
-        "Back": "<!-- wordflow-managed:3 -->{{FrontSide}}<hr><div class='answer'><div class='meaning'>{{MeaningZH}}</div><div class='definition'>{{DefinitionEN}}</div><div class='learning-note'>{{MemoryHook}}</div><div class='examples'>{{Examples}}</div><div class='collocations'>{{Collocations}}</div></div><div class='source'><a href='{{SourceURL}}'>{{SourceTitle}}</a></div>",
+        "Back": "<!-- wordflow-managed:4 -->{{FrontSide}}<hr><div class='answer'><div class='meaning'>{{MeaningZH}}</div><div class='learning-note'>{{MemoryHook}}</div><div class='definition'>{{DefinitionEN}}</div><div class='examples'>{{Examples}}</div><div class='collocations'>{{Collocations}}</div></div><div class='source'><a href='{{SourceURL}}'>{{SourceTitle}}</a></div>",
     },
     {
         "Name": "Production",
         "Front": "<div class='meaning'>{{MeaningZH}}</div><div class='context'>{{ContextCloze}}</div>",
-        "Back": "<!-- wordflow-managed:3 -->{{FrontSide}}<hr><div class='answer'><div class='word'>{{Word}}</div><div class='pron'>{{Pronunciation}}</div>{{Audio}}<div class='definition'>{{DefinitionEN}}</div><div class='learning-note'>{{MemoryHook}}</div><div class='examples'>{{Examples}}</div><div class='collocations'>{{Collocations}}</div></div>",
+        "Back": "<!-- wordflow-managed:4 -->{{FrontSide}}<hr><div class='answer'><div class='word'>{{Word}}</div><div class='pron'>{{Pronunciation}}</div>{{Audio}}<div class='learning-note'>{{MemoryHook}}</div><div class='definition'>{{DefinitionEN}}</div><div class='examples'>{{Examples}}</div><div class='collocations'>{{Collocations}}</div></div>",
     },
 ]
 
@@ -707,6 +755,34 @@ def html_examples(values: Iterable[str]) -> str:
         for value in values
         if value
     )
+
+
+def anki_fields(
+    card: Dict[str, Any],
+    capture: Dict[str, str],
+    *,
+    audio_field: str = "",
+) -> Dict[str, str]:
+    """Render one generated card into the stable Wordflow Anki field schema."""
+    return {
+        "Word": html_text(card["word"]),
+        "Lemma": html_text(card["lemma"]),
+        "Pronunciation": html_text(card["pronunciation"]),
+        "PartOfSpeech": html_text(card["part_of_speech"]),
+        "MeaningZH": html_text(card["meaning_zh"]),
+        "DefinitionEN": html_text(card["definition_en"]),
+        "Context": html_text(card["context"]),
+        "ContextCloze": html_text(card["context_cloze"]),
+        "Collocations": html_inline_items(card["collocations"]),
+        # These legacy Anki field names are retained so existing note types do
+        # not need a destructive schema migration.
+        "Etymology": "",
+        "MemoryHook": html_text(card["learning_note"]),
+        "Examples": html_examples(card["examples"]),
+        "SourceTitle": html_text(capture["source_title"]),
+        "SourceURL": html.escape(capture["source_url"], quote=True),
+        "Audio": audio_field,
+    }
 
 
 def safe_tag(value: str) -> str:
@@ -941,25 +1017,7 @@ class AnkiClient:
             tags.append(f"source-{source_tag}")
         tags.extend(filter(None, (safe_tag(tag) for tag in card.get("tags", []))))
 
-        fields = {
-            "Word": html_text(card["word"]),
-            "Lemma": html_text(card["lemma"]),
-            "Pronunciation": html_text(card["pronunciation"]),
-            "PartOfSpeech": html_text(card["part_of_speech"]),
-            "MeaningZH": html_text(card["meaning_zh"]),
-            "DefinitionEN": html_text(card["definition_en"]),
-            "Context": html_text(card["context"]),
-            "ContextCloze": html_text(card["context_cloze"]),
-            "Collocations": html_inline_items(card["collocations"]),
-            # These legacy Anki field names are retained so existing note types
-            # do not need a destructive schema migration.
-            "Etymology": "",
-            "MemoryHook": html_text(card["learning_note"]),
-            "Examples": html_examples(card["examples"]),
-            "SourceTitle": html_text(capture["source_title"]),
-            "SourceURL": html.escape(capture["source_url"], quote=True),
-            "Audio": "",
-        }
+        fields = anki_fields(card, capture)
         note: Dict[str, Any] = {
             "deckName": target_deck,
             "modelName": self.config.model_name,
@@ -1048,7 +1106,7 @@ class WordflowApp:
         return {
             "ok": True,
             "service": "wordflow-to-anki",
-            "version": "0.9.0",
+            "version": "0.9.1",
             "openai_configured": bool(self.config.openai_api_key) or self.config.mock_openai,
             "model": self.config.openai_model,
             "deck": self.preferences.default_deck(self.config.deck_name),
